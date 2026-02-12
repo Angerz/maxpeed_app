@@ -1,0 +1,71 @@
+# OS / Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+*.pem
+
+# -----------------
+# Backend (Django)
+# -----------------
+backend/.venv/
+backend/venv/
+backend/env/
+backend/__pycache__/
+backend/**/*.py[cod]
+backend/*.sqlite3
+backend/db.sqlite3
+backend/.pytest_cache/
+backend/.mypy_cache/
+backend/.ruff_cache/
+backend/.coverage
+backend/htmlcov/
+backend/coverage.xml
+backend/staticfiles/
+backend/media/
+backend/logs/
+backend/*.log
+
+# -----------------
+# Mobile (Flutter)
+# -----------------
+mobile/.dart_tool/
+mobile/.flutter-plugins
+mobile/.flutter-plugins-dependencies
+mobile/.packages
+mobile/.metadata
+mobile/build/
+mobile/coverage/
+mobile/pubspec.lock
+
+# Android
+mobile/android/.gradle/
+mobile/android/local.properties
+mobile/android/**/key.properties
+mobile/android/**/keystore.properties
+mobile/android/**/*.jks
+mobile/android/**/*.keystore
+
+# iOS / macOS
+mobile/ios/Pods/
+mobile/ios/.symlinks/
+mobile/ios/Flutter/ephemeral/
+mobile/ios/Flutter/Generated.xcconfig
+mobile/ios/Flutter/flutter_export_environment.sh
+mobile/ios/Runner.xcworkspace/xcuserdata/
+mobile/ios/Runner.xcodeproj/xcuserdata/
+mobile/macos/Pods/
+mobile/macos/Flutter/ephemeral/
+mobile/macos/Runner.xcworkspace/xcuserdata/
+mobile/macos/Runner.xcodeproj/xcuserdata/
+
+# Windows / Linux generated
+mobile/windows/flutter/ephemeral/
+mobile/linux/flutter/ephemeral/

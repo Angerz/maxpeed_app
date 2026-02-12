@@ -1,0 +1,43 @@
+name: maxpeed-app
+
+services:
+  maxpeed_db:
+    image: postgres:18-alpine
+    container_name: maxpeed_db
+    restart: unless-stopped
+    env_file:
+      - ../.env
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB?err}
+      POSTGRES_USER: ${POSTGRES_USER?err}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD?err}
+    volumes:
+      - maxpeed_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  maxpeed_backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: maxpeed_backend
+    restart: unless-stopped
+    env_file:
+      - ../.env
+    depends_on:
+      maxpeed_db:
+        condition: service_healthy
+    ports:
+      - "8001:8000"
+    volumes:
+      - ../backend:/app:delegated
+      - backend_static:/app/staticfiles
+    command: ["bash", "/app/scripts/dev.sh"]
+    user: "1000:1000"
+
+volumes:
+  maxpeed_db_data:
+  backend_static:
