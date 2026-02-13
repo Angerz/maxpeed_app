@@ -1,0 +1,78 @@
+import '../models/tire.dart';
+
+class MockTireRepository {
+  static final List<Tire> seedInventory = [
+    const Tire(
+      id: '1',
+      brand: 'Goodyear',
+      logoAsset: 'assets/brands/goodyear.png',
+      code: '195/65R13',
+      stock: 24,
+      description: '8PR, MT, TAILANDESA',
+      price: 285.0,
+    ),
+    const Tire(
+      id: '2',
+      brand: 'Michelin',
+      logoAsset: 'assets/brands/michelin.png',
+      code: '205/55R16',
+      stock: 18,
+      description: 'RADIAL, HT, FRANCESA',
+      price: 430.0,
+    ),
+    const Tire(
+      id: '3',
+      brand: 'Bridgestone',
+      logoAsset: 'assets/brands/bridgestone.png',
+      code: '750R16',
+      stock: 12,
+      description: '10PR, CARGA, JAPONESA',
+      price: 525.0,
+    ),
+    const Tire(
+      id: '4',
+      brand: 'Pirelli',
+      logoAsset: 'assets/brands/pirelli.png',
+      code: '12R22.5',
+      stock: 9,
+      description: 'TRACCIÓN, CARGA, BRASILEÑA',
+      price: 890.0,
+    ),
+    const Tire(
+      id: '5',
+      brand: 'Hankook',
+      logoAsset: 'assets/brands/hankook.png',
+      code: '235/75R15',
+      stock: 20,
+      description: 'AT, 6PR, COREANA',
+      price: 375.0,
+    ),
+    const Tire(
+      id: '6',
+      brand: 'Yokohama',
+      logoAsset: 'assets/brands/yokohama.png',
+      code: '175/70R13',
+      stock: 30,
+      description: 'RADIAL, ECO, JAPONESA',
+      price: 250.0,
+    ),
+    const Tire(
+      id: '7',
+      brand: 'Continental',
+      logoAsset: 'assets/brands/continental.png',
+      code: '185R14',
+      stock: 14,
+      description: 'CONVENCIONAL, 8PR, ALEMANA',
+      price: 310.0,
+    ),
+    const Tire(
+      id: '8',
+      brand: 'Dunlop',
+      logoAsset: 'assets/brands/dunlop.png',
+      code: '315/80R22.5',
+      stock: 7,
+      description: 'CARGA, MIXTO, JAPONESA',
+      price: 970.0,
+    ),
+  ];
+}
