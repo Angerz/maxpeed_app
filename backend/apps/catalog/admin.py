@@ -2,6 +2,10 @@ from django.contrib import admin
 
 from .models import Brand, CatalogItem, TireSpec
 
+admin.site.site_header = "Maxpeed Control"
+admin.site.site_title = "Maxpeed Admin"
+admin.site.index_title = "Operacion del backend"
+
 
 @admin.register(Brand)
 class BrandAdmin(admin.ModelAdmin):

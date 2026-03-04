@@ -1,0 +1,26 @@
+{% extends "admin/base.html" %}
+{% load static %}
+
+{% block title %}Maxpeed Control | {{ title }}{% endblock %}
+
+{% block extrastyle %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'catalog/admin/maxpeed-admin.css' %}">
+{% endblock %}
+
+{% block branding %}
+<div class="maxpeed-brand">
+    <div class="maxpeed-brand__badge">MX</div>
+    <div class="maxpeed-brand__copy">
+        <h1 id="site-name"><a href="{% url 'admin:index' %}">Maxpeed Control</a></h1>
+        <p>Catalogo, inventario y compras</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block nav-global %}
+<div class="maxpeed-nav-meta">
+    <span>Backend operativo</span>
+    <span>Panel administrativo</span>
+</div>
+{% endblock %}

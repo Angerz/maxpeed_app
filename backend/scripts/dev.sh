@@ -27,12 +27,18 @@ else:
     print('Superuser already exists or env missing')
 "
 
-export DJANGO_WSGI_MODULE="${DJANGO_WSGI_MODULE:-config.wsgi}"
-export GUNICORN_WORKERS="${GUNICORN_WORKERS:-2}"
-export GUNICORN_THREADS="${GUNICORN_THREADS:-2}"
+export DJANGO_DEV_SERVER="${DJANGO_DEV_SERVER:-runserver}"
 
-exec gunicorn "$DJANGO_WSGI_MODULE:application" \
-  --bind 0.0.0.0:8000 \
-  --workers "$GUNICORN_WORKERS" \
-  --threads "$GUNICORN_THREADS" \
-  --reload
+if [[ "$DJANGO_DEV_SERVER" == "gunicorn" ]]; then
+  export DJANGO_WSGI_MODULE="${DJANGO_WSGI_MODULE:-config.wsgi}"
+  export GUNICORN_WORKERS="${GUNICORN_WORKERS:-2}"
+  export GUNICORN_THREADS="${GUNICORN_THREADS:-2}"
+
+  exec gunicorn "$DJANGO_WSGI_MODULE:application" \
+    --bind 0.0.0.0:8000 \
+    --workers "$GUNICORN_WORKERS" \
+    --threads "$GUNICORN_THREADS" \
+    --reload
+fi
+
+exec python manage.py runserver 0.0.0.0:8000
