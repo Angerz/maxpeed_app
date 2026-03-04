@@ -31,7 +31,7 @@ class Brand(models.Model):
 
 
 class CatalogItem(models.Model):
-    sku = models.CharField(max_length=64, unique=True, db_index=True)
+    sku = models.CharField(max_length=64, unique=True)
     code = models.CharField(max_length=64, null=True, blank=True)
     item_kind = models.CharField(max_length=16, choices=ItemKind.choices)
     product_category = models.CharField(max_length=32, choices=ProductCategory.choices)
@@ -79,7 +79,6 @@ class CatalogItem(models.Model):
         ]
         indexes = [
             models.Index(fields=["item_kind", "product_category", "is_active"]),
-            models.Index(fields=["sku"]),
             models.Index(fields=["code"]),
         ]
 
