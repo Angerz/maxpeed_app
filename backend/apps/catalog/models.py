@@ -1,6 +1,7 @@
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Q
+from django.utils.text import slugify
 
 from .choices import (
     ItemKind,
@@ -84,6 +85,13 @@ class CatalogItem(models.Model):
 
     def clean(self):
         super().clean()
+        if self.model is not None:
+            self.model = self.model.strip() or None
+        if self.code is not None:
+            self.code = self.code.strip() or None
+        if self.sku is not None:
+            self.sku = self.sku.strip()
+
         is_service = self.item_kind == ItemKind.SERVICE
         is_merchandise = self.item_kind == ItemKind.MERCHANDISE
 
@@ -188,3 +196,17 @@ class TireSpec(models.Model):
     def save(self, *args, **kwargs):
         self.full_clean()
         return super().save(*args, **kwargs)
+
+
+def build_tire_sku(*, brand_name, width, rim_diameter, model=None, aspect_ratio=None):
+    parts = [
+        "TIRE",
+        slugify(brand_name).upper() or "BRAND",
+        str(width),
+    ]
+    if aspect_ratio is not None:
+        parts.append(str(aspect_ratio))
+    parts.append(rim_diameter.upper())
+    if model:
+        parts.append(slugify(model).upper())
+    return "-".join(part for part in parts if part)[:64]

@@ -29,6 +29,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'rest_framework',
     'apps.accounts',
     'apps.catalog',
     'apps.finance',
@@ -118,6 +119,16 @@ USE_TZ = _env_bool('DJANGO_USE_TZ', True)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = os.getenv('DJANGO_STATIC_URL', '/static/')
+
+REST_FRAMEWORK = {
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.AllowAny',
+    ],
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework.authentication.BasicAuthentication',
+    ],
+}
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
