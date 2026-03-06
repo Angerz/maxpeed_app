@@ -47,11 +47,42 @@ class ActiveInventoryQuerySet(models.QuerySet):
         return self.filter(is_active=True)
 
 
+class Owner(models.Model):
+    # Table-based owner is preferred over static choices because it scales as business grows.
+    name = models.CharField(max_length=120, unique=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self) -> str:
+        return self.name
+
+
+def get_default_owner_id():
+    default_owner = Owner.objects.filter(name__iexact="Maxpeed").only("id").first()
+    if default_owner:
+        return default_owner.id
+
+    fallback_owner = Owner.objects.only("id").order_by("id").first()
+    if fallback_owner:
+        return fallback_owner.id
+
+    raise Owner.DoesNotExist("No owner available. Run migrations to seed default owners.")
+
+
 class InventoryItem(models.Model):
     catalog_item = models.ForeignKey(
         "catalog.CatalogItem",
         on_delete=models.PROTECT,
         related_name="inventory_items",
+    )
+    owner = models.ForeignKey(
+        Owner,
+        on_delete=models.PROTECT,
+        related_name="inventory_items",
+        default=get_default_owner_id,
     )
     condition = models.CharField(max_length=8, choices=InventoryCondition.choices)
     stock = models.IntegerField(default=0)
@@ -63,11 +94,11 @@ class InventoryItem(models.Model):
     objects = ActiveInventoryQuerySet.as_manager()
 
     class Meta:
-        ordering = ["catalog_item__sku", "condition"]
+        ordering = ["catalog_item__sku", "owner__name", "condition"]
         constraints = [
             models.UniqueConstraint(
-                fields=["catalog_item", "condition"],
-                name="inventory_unique_catalog_item_condition",
+                fields=["catalog_item", "condition", "owner"],
+                name="inventory_unique_catalog_item_condition_owner",
             ),
             models.CheckConstraint(
                 condition=Q(stock__gte=0),
@@ -81,7 +112,7 @@ class InventoryItem(models.Model):
             raise ValidationError({"stock": "Stock cannot be negative."})
 
     def __str__(self) -> str:
-        return f"{self.catalog_item} [{self.condition}]"
+        return f"{self.catalog_item} [{self.condition}] ({self.owner.name})"
 
     def save(self, *args, **kwargs):
         self.full_clean()

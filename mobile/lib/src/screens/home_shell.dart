@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../data/mock_sales_repository.dart';
-import '../data/mock_tire_repository.dart';
 import 'inventory_screen.dart';
 import 'sales_screen.dart';
 import 'tire_entry_screen.dart';
@@ -19,7 +18,7 @@ class _HomeShellState extends State<HomeShell> {
   @override
   Widget build(BuildContext context) {
     final pages = [
-      InventoryScreen(tires: MockTireRepository.seedInventory),
+      const InventoryScreen(),
       const TireEntryScreen(),
       SalesScreen(sales: MockSalesRepository.sales),
     ];

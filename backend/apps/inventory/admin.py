@@ -1,20 +1,34 @@
 from django.contrib import admin
 
-from .models import InventoryItem, InventoryMovement, PriceRecord
+from .models import InventoryItem, InventoryMovement, Owner, PriceRecord
+
+
+@admin.register(Owner)
+class OwnerAdmin(admin.ModelAdmin):
+    list_display = ("name", "is_active", "created_at")
+    list_filter = ("is_active",)
+    search_fields = ("name",)
 
 
 @admin.register(InventoryItem)
 class InventoryItemAdmin(admin.ModelAdmin):
     list_display = (
         "catalog_item",
+        "owner",
         "condition",
         "stock",
         "is_active",
         "last_restock_at",
         "updated_at",
     )
-    list_filter = ("condition", "is_active")
-    search_fields = ("catalog_item__sku", "catalog_item__code", "catalog_item__brand__name", "catalog_item__model")
+    list_filter = ("condition", "owner", "is_active")
+    search_fields = (
+        "catalog_item__sku",
+        "catalog_item__code",
+        "catalog_item__brand__name",
+        "catalog_item__model",
+        "owner__name",
+    )
 
 
 @admin.register(PriceRecord)

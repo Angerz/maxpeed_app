@@ -11,6 +11,7 @@ from apps.catalog.choices import (
     TreadType,
 )
 from apps.catalog.models import Brand, TireSpec
+from apps.inventory.models import Owner
 
 
 class StockReceiptCreateSerializer(serializers.Serializer):
@@ -18,6 +19,12 @@ class StockReceiptCreateSerializer(serializers.Serializer):
     brand_id = serializers.PrimaryKeyRelatedField(
         source="brand",
         queryset=Brand.objects.all(),
+    )
+    owner_id = serializers.PrimaryKeyRelatedField(
+        source="owner",
+        queryset=Owner.objects.filter(is_active=True),
+        required=False,
+        allow_null=True,
     )
     rim_diameter = serializers.ChoiceField(choices=RimDiameter.choices)
     origin = serializers.ChoiceField(choices=Origin.choices)
@@ -62,6 +69,11 @@ class StockReceiptCreateSerializer(serializers.Serializer):
                 attrs["unit_purchase_price"] * Decimal("1.30")
             ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
+        if attrs.get("owner") is None:
+            attrs["owner"] = Owner.objects.filter(name__iexact="Maxpeed").first() or Owner.objects.order_by("id").first()
+            if attrs["owner"] is None:
+                raise serializers.ValidationError({"owner_id": "No owners configured in the system."})
+
         return attrs
 
 
@@ -77,3 +89,68 @@ class StockReceiptCreateResponseSerializer(serializers.Serializer):
     stock_after = serializers.IntegerField()
     prices_current = CurrentPricesSerializer()
     created_new_catalog_item = serializers.BooleanField()
+
+
+class InventoryOwnerSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    name = serializers.CharField()
+
+
+class InventoryCardSerializer(serializers.Serializer):
+    inventory_item_id = serializers.IntegerField()
+    code = serializers.CharField(allow_null=True)
+    brand = serializers.CharField(allow_null=True)
+    stock = serializers.IntegerField()
+    details = serializers.CharField()
+    owner = InventoryOwnerSerializer()
+
+
+class InventoryDetailSerializer(serializers.Serializer):
+    inventory_item_id = serializers.IntegerField()
+    code = serializers.CharField(allow_null=True)
+    tire_type = serializers.CharField(allow_null=True)
+    brand = serializers.CharField(allow_null=True)
+    stock = serializers.IntegerField()
+    owner = InventoryOwnerSerializer()
+    details = serializers.CharField()
+    purchase_price = serializers.DecimalField(max_digits=12, decimal_places=2, allow_null=True)
+    suggested_sale_price = serializers.DecimalField(max_digits=12, decimal_places=2, allow_null=True)
+    last_restock_at = serializers.DateTimeField(allow_null=True)
+    created_at = serializers.DateTimeField(allow_null=True)
+    updated_at = serializers.DateTimeField(allow_null=True)
+
+
+class RestockSerializer(serializers.Serializer):
+    quantity = serializers.IntegerField(min_value=1)
+    unit_purchase_price = serializers.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        min_value=Decimal("0.01"),
+    )
+    suggested_sale_price = serializers.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        min_value=Decimal("0.01"),
+        required=False,
+        allow_null=True,
+    )
+    notes = serializers.CharField(required=False, allow_blank=True, allow_null=True, max_length=1000)
+
+    def validate(self, attrs):
+        if attrs.get("suggested_sale_price") is None:
+            attrs["suggested_sale_price"] = (
+                attrs["unit_purchase_price"] * Decimal("1.30")
+            ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        return attrs
+
+
+class RestockResponseSerializer(serializers.Serializer):
+    inventory_item_id = serializers.IntegerField()
+    stock_before = serializers.IntegerField()
+    stock_after = serializers.IntegerField()
+    purchase_price_current = serializers.DecimalField(max_digits=12, decimal_places=2)
+    suggested_sale_price_current = serializers.DecimalField(max_digits=12, decimal_places=2)
+    receipt_id = serializers.IntegerField()
+    receipt_line_id = serializers.IntegerField()
+    movement_id = serializers.IntegerField()
+    last_restock_at = serializers.DateTimeField(allow_null=True)

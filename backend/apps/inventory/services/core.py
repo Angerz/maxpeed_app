@@ -2,7 +2,7 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
 
-from .models import InventoryItem, InventoryMovement, MovementType, PriceRecord
+from apps.inventory.models import InventoryItem, InventoryMovement, MovementType, PriceRecord
 
 
 @transaction.atomic

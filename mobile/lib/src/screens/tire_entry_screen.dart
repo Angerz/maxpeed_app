@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../models/brand_option.dart';
 import '../models/catalog_choice_option.dart';
 import '../models/catalog_choices.dart';
+import '../models/owner.dart';
 import '../services/catalog_api_service.dart';
 import '../widgets/brand_autocomplete_field.dart';
 
@@ -28,6 +29,7 @@ class _TireEntryScreenState extends State<TireEntryScreen> {
 
   CatalogChoices? _choices;
   BrandOption? _selectedBrand;
+  Owner? _selectedOwner;
   CatalogChoiceOption? _selectedTireType;
   CatalogChoiceOption? _selectedRimDiameter;
   CatalogChoiceOption? _selectedOrigin;
@@ -71,6 +73,9 @@ class _TireEntryScreenState extends State<TireEntryScreen> {
       }
       setState(() {
         _choices = choices;
+        _selectedOwner = choices.owners.isNotEmpty
+            ? choices.owners.first
+            : null;
       });
     } catch (error) {
       if (!mounted) {
@@ -113,7 +118,11 @@ class _TireEntryScreenState extends State<TireEntryScreen> {
     return null;
   }
 
-  String? _decimalValidator(String? value, String fieldName, {bool required = true}) {
+  String? _decimalValidator(
+    String? value,
+    String fieldName, {
+    bool required = true,
+  }) {
     if (!required && (value == null || value.trim().isEmpty)) {
       return null;
     }
@@ -140,6 +149,7 @@ class _TireEntryScreenState extends State<TireEntryScreen> {
     }
 
     if (_selectedBrand == null ||
+        _selectedOwner == null ||
         _selectedTireType == null ||
         _selectedRimDiameter == null ||
         _selectedOrigin == null ||
@@ -147,7 +157,9 @@ class _TireEntryScreenState extends State<TireEntryScreen> {
         _selectedTreadType == null ||
         _selectedLetterColor == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Completa todos los selectores obligatorios.')),
+        const SnackBar(
+          content: Text('Completa todos los selectores obligatorios.'),
+        ),
       );
       return;
     }
@@ -157,9 +169,10 @@ class _TireEntryScreenState extends State<TireEntryScreen> {
     });
 
     try {
-      final response = await _apiService.createStockReceipt(
+      final response = await _apiService.postStockReceipt(
         tireType: _selectedTireType!.value,
         brandId: _selectedBrand!.id,
+        ownerId: _selectedOwner!.id,
         rimDiameter: _selectedRimDiameter!.value,
         origin: _selectedOrigin!.value,
         plyRating: _selectedPlyRating!.value,
@@ -174,7 +187,9 @@ class _TireEntryScreenState extends State<TireEntryScreen> {
         recommendedSalePrice: _suggestedPriceController.text.trim().isEmpty
             ? null
             : _suggestedPriceController.text.trim(),
-        model: _modelController.text.trim().isEmpty ? null : _modelController.text.trim(),
+        model: _modelController.text.trim().isEmpty
+            ? null
+            : _modelController.text.trim(),
       );
 
       if (!mounted) {
@@ -185,7 +200,9 @@ class _TireEntryScreenState extends State<TireEntryScreen> {
       final stockAfter = response['stock_after'];
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Ingreso registrado. Recibo #$receiptId | Stock: $stockAfter'),
+          content: Text(
+            'Ingreso registrado. Recibo #$receiptId | Stock: $stockAfter',
+          ),
         ),
       );
 
@@ -198,9 +215,9 @@ class _TireEntryScreenState extends State<TireEntryScreen> {
       final message = error is ApiException
           ? error.message
           : 'No se pudo registrar el ingreso.';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
     } finally {
       if (mounted) {
         setState(() {
@@ -222,6 +239,9 @@ class _TireEntryScreenState extends State<TireEntryScreen> {
 
     setState(() {
       _selectedBrand = null;
+      _selectedOwner = _choices != null && _choices!.owners.isNotEmpty
+          ? _choices!.owners.first
+          : null;
       _selectedTireType = null;
       _selectedRimDiameter = null;
       _selectedOrigin = null;
@@ -272,10 +292,7 @@ class _TireEntryScreenState extends State<TireEntryScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                _loadError!,
-                textAlign: TextAlign.center,
-              ),
+              Text(_loadError!, textAlign: TextAlign.center),
               const SizedBox(height: 16),
               FilledButton(
                 onPressed: _loadInitialData,
@@ -299,6 +316,30 @@ class _TireEntryScreenState extends State<TireEntryScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            DropdownButtonFormField<Owner>(
+              value: _selectedOwner,
+              decoration: const InputDecoration(labelText: 'Dueño *'),
+              items: choices.owners
+                  .map(
+                    (owner) => DropdownMenuItem<Owner>(
+                      value: owner,
+                      child: Text(owner.name),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (owner) {
+                setState(() {
+                  _selectedOwner = owner;
+                });
+              },
+              validator: (value) {
+                if (value == null) {
+                  return 'Selecciona Dueño';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 12),
             _buildChoiceField(
               label: 'Tipo de neumático',
               fieldKey: 'tire_type',
@@ -314,15 +355,6 @@ class _TireEntryScreenState extends State<TireEntryScreen> {
               },
             ),
             const SizedBox(height: 12),
-            BrandAutocompleteField(
-              controller: _brandController,
-              initialValue: _selectedBrand,
-              searchBrands: _apiService.searchBrands,
-              onSelected: (brand) {
-                _selectedBrand = brand;
-              },
-            ),
-            const SizedBox(height: 12),
             _buildChoiceField(
               label: 'Aro',
               fieldKey: 'rim_diameter',
@@ -332,6 +364,35 @@ class _TireEntryScreenState extends State<TireEntryScreen> {
                 setState(() {
                   _selectedRimDiameter = value;
                 });
+              },
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _widthController,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              textInputAction: TextInputAction.next,
+              decoration: const InputDecoration(labelText: 'Ancho *'),
+              validator: (value) => _intValidator(value, 'Ancho'),
+            ),
+            if (_showProfileField) ...[
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _profileController,
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                textInputAction: TextInputAction.next,
+                decoration: const InputDecoration(labelText: 'Perfil *'),
+                validator: (value) => _intValidator(value, 'Perfil'),
+              ),
+            ],
+            const SizedBox(height: 12),
+            BrandAutocompleteField(
+              controller: _brandController,
+              initialValue: _selectedBrand,
+              searchBrands: _apiService.searchBrands,
+              onSelected: (brand) {
+                _selectedBrand = brand;
               },
             ),
             const SizedBox(height: 12),
@@ -382,26 +443,7 @@ class _TireEntryScreenState extends State<TireEntryScreen> {
                 });
               },
             ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _widthController,
-              keyboardType: TextInputType.number,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              textInputAction: TextInputAction.next,
-              decoration: const InputDecoration(labelText: 'Ancho *'),
-              validator: (value) => _intValidator(value, 'Ancho'),
-            ),
-            if (_showProfileField) ...[
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _profileController,
-                keyboardType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                textInputAction: TextInputAction.next,
-                decoration: const InputDecoration(labelText: 'Perfil *'),
-                validator: (value) => _intValidator(value, 'Perfil'),
-              ),
-            ],
+
             const SizedBox(height: 12),
             TextFormField(
               controller: _quantityController,
@@ -414,24 +456,38 @@ class _TireEntryScreenState extends State<TireEntryScreen> {
             const SizedBox(height: 12),
             TextFormField(
               controller: _priceController,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+              ],
               textInputAction: TextInputAction.next,
-              decoration: const InputDecoration(labelText: 'Precio de compra *'),
-              validator: (value) => _decimalValidator(value, 'Precio de compra'),
+              decoration: const InputDecoration(
+                labelText: 'Precio de compra *',
+              ),
+              validator: (value) =>
+                  _decimalValidator(value, 'Precio de compra'),
             ),
             const SizedBox(height: 12),
             TextFormField(
               controller: _suggestedPriceController,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+              ],
               textInputAction: TextInputAction.next,
               decoration: const InputDecoration(
                 labelText: 'Precio sugerido de venta',
                 hintText: 'Opcional',
               ),
-              validator: (value) =>
-                  _decimalValidator(value, 'Precio sugerido de venta', required: false),
+              validator: (value) => _decimalValidator(
+                value,
+                'Precio sugerido de venta',
+                required: false,
+              ),
             ),
             const SizedBox(height: 12),
             TextFormField(

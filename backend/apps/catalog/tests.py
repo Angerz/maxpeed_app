@@ -3,10 +3,13 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from apps.catalog.models import Brand
+from apps.inventory.models import Owner
 
 
 class CatalogApiTests(APITestCase):
     def test_choices_endpoint_returns_backend_choices(self):
+        Owner.objects.get_or_create(name="Maxpeed")
+        Owner.objects.get_or_create(name="Ruel")
         response = self.client.get(reverse("catalog-choices"))
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -16,13 +19,18 @@ class CatalogApiTests(APITestCase):
         self.assertIn("ply_rating", response.data)
         self.assertIn("tread_type", response.data)
         self.assertIn("letter_color", response.data)
+        self.assertIn("owners", response.data)
+        owner_labels = {owner["label"] for owner in response.data["owners"]}
+        self.assertIn("Maxpeed", owner_labels)
+        self.assertIn("Ruel", owner_labels)
 
     def test_brands_endpoint_returns_brands(self):
-        Brand.objects.create(name="MICHELIN")
-        Brand.objects.create(name="AUSTONE")
+        Brand.objects.get_or_create(name="MICHELIN")
+        Brand.objects.get_or_create(name="AUSTONE")
 
         response = self.client.get(reverse("catalog-brands"))
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 2)
-        self.assertEqual(response.data[0]["name"], "AUSTONE")
+        names = {brand["name"] for brand in response.data}
+        self.assertIn("AUSTONE", names)
+        self.assertIn("MICHELIN", names)

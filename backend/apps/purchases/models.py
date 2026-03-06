@@ -4,7 +4,7 @@ from django.db import models, transaction
 from django.utils import timezone
 
 from apps.inventory.models import MovementType, PriceType
-from apps.inventory.services import apply_inventory_movement, set_current_price
+from apps.inventory.services.core import apply_inventory_movement, set_current_price
 
 
 class StockReceipt(models.Model):

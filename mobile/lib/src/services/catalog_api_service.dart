@@ -6,6 +6,10 @@ import 'package:http/http.dart' as http;
 import '../models/brand_option.dart';
 import '../models/catalog_choice_option.dart';
 import '../models/catalog_choices.dart';
+import '../models/inventory_detail.dart';
+import '../models/inventory_group_response.dart';
+import '../models/restock_request.dart';
+import '../models/restock_response.dart';
 
 class ApiException implements Exception {
   const ApiException(this.message);
@@ -57,9 +61,10 @@ class CatalogApiService {
         .toList();
   }
 
-  Future<Map<String, dynamic>> createStockReceipt({
+  Future<Map<String, dynamic>> postStockReceipt({
     required String tireType,
     required int brandId,
+    required int ownerId,
     required String rimDiameter,
     required String origin,
     required String plyRating,
@@ -76,6 +81,7 @@ class CatalogApiService {
     final payload = <String, dynamic>{
       'tire_type': tireType,
       'brand_id': brandId,
+      'owner_id': ownerId,
       'rim_diameter': rimDiameter,
       'origin': origin,
       'ply_rating': plyRating,
@@ -116,6 +122,102 @@ class CatalogApiService {
     }
 
     return decoded;
+  }
+
+  Future<Map<String, dynamic>> createStockReceipt({
+    required String tireType,
+    required int brandId,
+    required int ownerId,
+    required String rimDiameter,
+    required String origin,
+    required String plyRating,
+    required String treadType,
+    required String letterColor,
+    required int width,
+    required int quantity,
+    required String unitPurchasePrice,
+    int? aspectRatio,
+    String? recommendedSalePrice,
+    String? model,
+  }) {
+    return postStockReceipt(
+      tireType: tireType,
+      brandId: brandId,
+      ownerId: ownerId,
+      rimDiameter: rimDiameter,
+      origin: origin,
+      plyRating: plyRating,
+      treadType: treadType,
+      letterColor: letterColor,
+      width: width,
+      quantity: quantity,
+      unitPurchasePrice: unitPurchasePrice,
+      aspectRatio: aspectRatio,
+      recommendedSalePrice: recommendedSalePrice,
+      model: model,
+    );
+  }
+
+  Future<InventoryGroupResponse> fetchInventory({
+    required bool includeZeroStock,
+  }) async {
+    final uri = Uri.http(
+      '$host:$port',
+      '/api/inventory/items/',
+      {'include_zero_stock': includeZeroStock.toString()},
+    );
+    final response = await _getJson(uri);
+    if (response is! Map<String, dynamic>) {
+      throw const ApiException('Respuesta inválida al cargar inventario');
+    }
+    return InventoryGroupResponse.fromJson(response);
+  }
+
+  Future<InventoryDetail> fetchInventoryDetail(int inventoryItemId) async {
+    final uri = Uri.http('$host:$port', '/api/inventory/items/$inventoryItemId/');
+    final response = await _getJson(uri);
+    if (response is! Map<String, dynamic>) {
+      throw const ApiException('Respuesta inválida al cargar detalle');
+    }
+    return InventoryDetail.fromJson(response);
+  }
+
+  Future<RestockResponse> restockInventoryItem(
+    int inventoryItemId,
+    RestockRequest requestPayload,
+  ) async {
+    final uri = Uri.http(
+      '$host:$port',
+      '/api/inventory/items/$inventoryItemId/restock/',
+    );
+
+    http.Response response;
+    try {
+      response = await _client
+          .post(
+            uri,
+            headers: const {'Content-Type': 'application/json'},
+            body: jsonEncode(requestPayload.toJson()),
+          )
+          .timeout(_requestTimeout, onTimeout: () {
+        throw const ApiException(
+          'Tiempo de espera agotado al registrar restock. Verifica conexión y servidor.',
+        );
+      });
+    } on http.ClientException catch (error) {
+      throw ApiException('Error de conexión: ${error.message}');
+    } on TimeoutException {
+      throw const ApiException(
+        'Tiempo de espera agotado al registrar restock. Verifica conexión y servidor.',
+      );
+    }
+
+    final decoded = _decodeResponse(response);
+    if (decoded is! Map<String, dynamic>) {
+      throw const ApiException('Respuesta inválida al registrar restock');
+    }
+
+    return RestockResponse.fromJson(decoded);
   }
 
   Future<dynamic> _getJson(Uri uri) async {

@@ -1,16 +1,21 @@
 import 'package:flutter/material.dart';
 
-import '../models/tire.dart';
+import '../models/inventory_card_item.dart';
 
 class TireInventoryCard extends StatelessWidget {
   const TireInventoryCard({
     super.key,
-    required this.tire,
+    required this.item,
     this.onTap,
   });
 
-  final Tire tire;
+  final InventoryCardItem item;
   final VoidCallback? onTap;
+
+  String get _logoAsset {
+    final normalized = item.brand.toLowerCase().replaceAll(' ', '_');
+    return 'assets/brands/$normalized.png';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -34,11 +39,11 @@ class TireInventoryCard extends StatelessWidget {
                     child: FractionallySizedBox(
                       widthFactor: 0.85,
                       child: Image.asset(
-                        tire.logoAsset,
+                        _logoAsset,
                         fit: BoxFit.contain,
                         alignment: Alignment.centerRight,
                         errorBuilder: (_, __, ___) {
-                          return _BrandPlaceholder(brand: tire.brand);
+                          return _BrandPlaceholder(brand: item.brand);
                         },
                       ),
                     ),
@@ -51,30 +56,30 @@ class TireInventoryCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      tire.code,
+                      item.code,
                       style: theme.textTheme.headlineSmall?.copyWith(
                         fontWeight: FontWeight.w700,
                       ),
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      tire.brand,
+                      item.brand,
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 8),
                     Text(
-                      'Stock: ${tire.stock}',
-                      style: theme.textTheme.bodyLarge?.copyWith(
-                        fontWeight: FontWeight.w600,
+                      '${item.stock}',
+                      style: theme.textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: theme.colorScheme.primary,
                       ),
                     ),
                     const SizedBox(height: 4),
-                    Text(
-                      tire.description,
-                      style: theme.textTheme.bodyMedium,
-                    ),
+                    Text(item.details, style: theme.textTheme.bodyMedium),
+                    const SizedBox(height: 2),
+                    Text(item.owner?.name ?? '-', style: theme.textTheme.bodyMedium),
                   ],
                 ),
               ),

@@ -1,4 +1,5 @@
 import 'catalog_choice_option.dart';
+import 'owner.dart';
 
 class CatalogChoices {
   const CatalogChoices({
@@ -8,6 +9,7 @@ class CatalogChoices {
     required this.plyRatings,
     required this.treadTypes,
     required this.letterColors,
+    required this.owners,
   });
 
   final List<CatalogChoiceOption> tireTypes;
@@ -16,6 +18,7 @@ class CatalogChoices {
   final List<CatalogChoiceOption> plyRatings;
   final List<CatalogChoiceOption> treadTypes;
   final List<CatalogChoiceOption> letterColors;
+  final List<Owner> owners;
 
   factory CatalogChoices.fromJson(Map<String, dynamic> json) {
     List<CatalogChoiceOption> parseList(String key) {
@@ -36,6 +39,12 @@ class CatalogChoices {
       plyRatings: parseList('ply_rating'),
       treadTypes: parseList('tread_type'),
       letterColors: parseList('letter_color'),
+      owners: (json['owners'] is List)
+          ? (json['owners'] as List)
+              .whereType<Map>()
+              .map((item) => Owner.fromJson(item.cast<String, dynamic>()))
+              .toList()
+          : const [],
     );
   }
 }

@@ -90,9 +90,10 @@ class CatalogChoicesSerializer(serializers.Serializer):
     ply_rating = serializers.ListField()
     tread_type = serializers.ListField()
     letter_color = serializers.ListField()
+    owners = serializers.ListField()
 
     @classmethod
-    def build_payload(cls):
+    def build_payload(cls, *, owners):
         return {
             "tire_type": serialize_choices(TireType, SPANISH_CHOICE_LABELS["tire_type"]),
             "rim_diameter": serialize_choices(RimDiameter, SPANISH_CHOICE_LABELS["rim_diameter"]),
@@ -100,6 +101,7 @@ class CatalogChoicesSerializer(serializers.Serializer):
             "ply_rating": serialize_choices(PlyRating, SPANISH_CHOICE_LABELS["ply_rating"]),
             "tread_type": serialize_choices(TreadType, SPANISH_CHOICE_LABELS["tread_type"]),
             "letter_color": serialize_choices(LetterColor, SPANISH_CHOICE_LABELS["letter_color"]),
+            "owners": owners,
         }
 
 

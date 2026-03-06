@@ -5,7 +5,7 @@ from django.utils import timezone
 from apps.catalog.choices import ItemKind, ProductCategory
 from apps.catalog.models import CatalogItem, TireSpec, build_tire_sku
 from apps.inventory.models import InventoryCondition, InventoryItem, PriceRecord, PriceType
-from apps.inventory.services import set_current_price
+from apps.inventory.services.core import set_current_price
 from apps.purchases.models import StockReceipt, StockReceiptLine
 
 
@@ -98,6 +98,7 @@ def create_tire_stock_receipt(*, payload, user=None):
     inventory_item, _ = InventoryItem.objects.select_for_update().get_or_create(
         catalog_item=catalog_item,
         condition=InventoryCondition.NEW,
+        owner=payload["owner"],
         defaults={"stock": 0, "is_active": True},
     )
 
