@@ -8,7 +8,6 @@ import '../models/catalog_choice_option.dart';
 import '../models/catalog_choices.dart';
 import '../models/inventory_detail.dart';
 import '../models/inventory_group_response.dart';
-import '../models/paginated_response.dart';
 import '../models/rim_grouped_response.dart';
 import '../models/rim_receipt_request.dart';
 import '../models/restock_request.dart';
@@ -58,8 +57,8 @@ class CatalogApiService {
     final rawList = response is List
         ? response
         : response is Map<String, dynamic> && response['results'] is List
-            ? response['results'] as List
-            : <dynamic>[];
+        ? response['results'] as List
+        : <dynamic>[];
 
     return rawList
         .whereType<Map>()
@@ -73,8 +72,8 @@ class CatalogApiService {
     final rawList = response is List
         ? response
         : response is Map<String, dynamic> && response['results'] is List
-            ? response['results'] as List
-            : <dynamic>[];
+        ? response['results'] as List
+        : <dynamic>[];
 
     return rawList
         .whereType<Map>()
@@ -124,11 +123,14 @@ class CatalogApiService {
             headers: const {'Content-Type': 'application/json'},
             body: jsonEncode(payload),
           )
-          .timeout(_requestTimeout, onTimeout: () {
-        throw const ApiException(
-          'Tiempo de espera agotado al registrar el ingreso. Verifica conexión y servidor.',
-        );
-      });
+          .timeout(
+            _requestTimeout,
+            onTimeout: () {
+              throw const ApiException(
+                'Tiempo de espera agotado al registrar el ingreso. Verifica conexión y servidor.',
+              );
+            },
+          );
     } on http.ClientException catch (error) {
       throw ApiException('Error de conexión: ${error.message}');
     } on TimeoutException {
@@ -182,11 +184,9 @@ class CatalogApiService {
   Future<InventoryGroupResponse> fetchInventory({
     required bool includeZeroStock,
   }) async {
-    final uri = Uri.http(
-      '$host:$port',
-      '/api/inventory/items/',
-      {'include_zero_stock': includeZeroStock.toString()},
-    );
+    final uri = Uri.http('$host:$port', '/api/inventory/items/', {
+      'include_zero_stock': includeZeroStock.toString(),
+    });
     final response = await _getJson(uri);
     if (response is! Map<String, dynamic>) {
       throw const ApiException('Respuesta inválida al cargar inventario');
@@ -198,13 +198,18 @@ class CatalogApiService {
     final uri = Uri.http('$host:$port', '/api/inventory/rims/');
     final response = await _getJson(uri);
     if (response is! Map<String, dynamic>) {
-      throw const ApiException('Respuesta inválida al cargar inventario de aros');
+      throw const ApiException(
+        'Respuesta inválida al cargar inventario de aros',
+      );
     }
     return RimGroupedResponse.fromJson(response);
   }
 
   Future<InventoryDetail> fetchInventoryDetail(int inventoryItemId) async {
-    final uri = Uri.http('$host:$port', '/api/inventory/items/$inventoryItemId/');
+    final uri = Uri.http(
+      '$host:$port',
+      '/api/inventory/items/$inventoryItemId/',
+    );
     final response = await _getJson(uri);
     if (response is! Map<String, dynamic>) {
       throw const ApiException('Respuesta inválida al cargar detalle');
@@ -229,11 +234,14 @@ class CatalogApiService {
             headers: const {'Content-Type': 'application/json'},
             body: jsonEncode(requestPayload.toJson()),
           )
-          .timeout(_requestTimeout, onTimeout: () {
-        throw const ApiException(
-          'Tiempo de espera agotado al registrar restock. Verifica conexión y servidor.',
-        );
-      });
+          .timeout(
+            _requestTimeout,
+            onTimeout: () {
+              throw const ApiException(
+                'Tiempo de espera agotado al registrar restock. Verifica conexión y servidor.',
+              );
+            },
+          );
     } on http.ClientException catch (error) {
       throw ApiException('Error de conexión: ${error.message}');
     } on TimeoutException {
@@ -261,11 +269,14 @@ class CatalogApiService {
             headers: const {'Content-Type': 'application/json'},
             body: jsonEncode(request.toJson()),
           )
-          .timeout(_requestTimeout, onTimeout: () {
-        throw const ApiException(
-          'Tiempo de espera agotado al registrar ingreso de aro. Verifica conexión y servidor.',
-        );
-      });
+          .timeout(
+            _requestTimeout,
+            onTimeout: () {
+              throw const ApiException(
+                'Tiempo de espera agotado al registrar ingreso de aro. Verifica conexión y servidor.',
+              );
+            },
+          );
     } on http.ClientException catch (error) {
       throw ApiException('Error de conexión: ${error.message}');
     } on TimeoutException {
@@ -276,14 +287,19 @@ class CatalogApiService {
 
     final decoded = _decodeResponse(response);
     if (decoded is! Map<String, dynamic>) {
-      throw const ApiException('Respuesta inválida al registrar ingreso de aro');
+      throw const ApiException(
+        'Respuesta inválida al registrar ingreso de aro',
+      );
     }
 
     return decoded;
   }
 
   Future<void> deactivateRim(int inventoryItemId, {String? reason}) async {
-    final uri = Uri.http('$host:$port', '/api/inventory/rims/$inventoryItemId/deactivate/');
+    final uri = Uri.http(
+      '$host:$port',
+      '/api/inventory/rims/$inventoryItemId/deactivate/',
+    );
     final payload = reason == null || reason.trim().isEmpty
         ? const <String, dynamic>{}
         : <String, dynamic>{'reason': reason.trim()};
@@ -296,11 +312,14 @@ class CatalogApiService {
             headers: const {'Content-Type': 'application/json'},
             body: jsonEncode(payload),
           )
-          .timeout(_requestTimeout, onTimeout: () {
-        throw const ApiException(
-          'Tiempo de espera agotado al desactivar aro. Verifica conexión y servidor.',
-        );
-      });
+          .timeout(
+            _requestTimeout,
+            onTimeout: () {
+              throw const ApiException(
+                'Tiempo de espera agotado al desactivar aro. Verifica conexión y servidor.',
+              );
+            },
+          );
     } on http.ClientException catch (error) {
       throw ApiException('Error de conexión: ${error.message}');
     } on TimeoutException {
@@ -318,8 +337,8 @@ class CatalogApiService {
     final rawList = response is List
         ? response
         : response is Map<String, dynamic> && response['results'] is List
-            ? response['results'] as List
-            : <dynamic>[];
+        ? response['results'] as List
+        : <dynamic>[];
 
     return rawList
         .map(ServiceOption.fromDynamic)
@@ -338,11 +357,14 @@ class CatalogApiService {
             headers: const {'Content-Type': 'application/json'},
             body: jsonEncode(request.toJson()),
           )
-          .timeout(_requestTimeout, onTimeout: () {
-        throw const ApiException(
-          'Tiempo de espera agotado al registrar venta. Verifica conexión y servidor.',
-        );
-      });
+          .timeout(
+            _requestTimeout,
+            onTimeout: () {
+              throw const ApiException(
+                'Tiempo de espera agotado al registrar venta. Verifica conexión y servidor.',
+              );
+            },
+          );
     } on http.ClientException catch (error) {
       throw ApiException('Error de conexión: ${error.message}');
     } on TimeoutException {
@@ -358,10 +380,20 @@ class CatalogApiService {
     return SaleCreateResponse.fromJson(decoded);
   }
 
-  Future<PaginatedResponse<SaleListItem>> fetchSales({String? url}) async {
+  Future<SalesListResponse> fetchSales({
+    DateTime? start,
+    DateTime? end,
+    String? url,
+  }) async {
     Uri uri;
     if (url == null || url.trim().isEmpty) {
-      uri = Uri.http('$host:$port', '/api/sales/');
+      if (start == null || end == null) {
+        throw const ApiException('Rango de fechas inválido para cargar ventas');
+      }
+      uri = Uri.http('$host:$port', '/api/sales/', {
+        'start_date': _toYmd(start),
+        'end_date': _toYmd(end),
+      });
     } else if (url.startsWith('http://') || url.startsWith('https://')) {
       uri = Uri.parse(url);
     } else {
@@ -372,7 +404,7 @@ class CatalogApiService {
     if (response is! Map<String, dynamic>) {
       throw const ApiException('Respuesta inválida al cargar ventas');
     }
-    return PaginatedResponse<SaleListItem>.fromJson(response, SaleListItem.fromJson);
+    return SalesListResponse.fromJson(response);
   }
 
   Future<SaleDetail> fetchSaleDetail(int id) async {
@@ -386,11 +418,16 @@ class CatalogApiService {
 
   Future<dynamic> _getJson(Uri uri) async {
     try {
-      final response = await _client.get(uri).timeout(_requestTimeout, onTimeout: () {
-        throw const ApiException(
-          'Tiempo de espera agotado al cargar datos. Verifica conexión y servidor.',
-        );
-      });
+      final response = await _client
+          .get(uri)
+          .timeout(
+            _requestTimeout,
+            onTimeout: () {
+              throw const ApiException(
+                'Tiempo de espera agotado al cargar datos. Verifica conexión y servidor.',
+              );
+            },
+          );
       return _decodeResponse(response);
     } on http.ClientException catch (error) {
       throw ApiException('Error de conexión: ${error.message}');
@@ -420,11 +457,14 @@ class CatalogApiService {
     try {
       final decoded = jsonDecode(body);
       if (decoded is Map<String, dynamic>) {
-        final detail = decoded['detail'] ?? decoded['message'] ?? decoded['error'];
+        final detail =
+            decoded['detail'] ?? decoded['message'] ?? decoded['error'];
         if (detail != null) {
           return detail.toString();
         }
-        return decoded.entries.map((entry) => '${entry.key}: ${entry.value}').join(' | ');
+        return decoded.entries
+            .map((entry) => '${entry.key}: ${entry.value}')
+            .join(' | ');
       }
       if (decoded is List && decoded.isNotEmpty) {
         return decoded.join(' | ');
@@ -438,6 +478,13 @@ class CatalogApiService {
     }
 
     return 'Error de servidor ($statusCode)';
+  }
+
+  String _toYmd(DateTime date) {
+    final y = date.year.toString().padLeft(4, '0');
+    final m = date.month.toString().padLeft(2, '0');
+    final d = date.day.toString().padLeft(2, '0');
+    return '$y-$m-$d';
   }
 
   String translateLabel(String fieldKey, CatalogChoiceOption option) {
@@ -466,18 +513,9 @@ class CatalogApiService {
         'SPORT': 'Deportiva',
         'MIXED': 'Mixta',
       },
-      'letter_color': {
-        'BLACK': 'Negro',
-        'WHITE': 'Blanco',
-      },
-      'rim_material': {
-        'ALUMINUM': 'Aluminio',
-        'IRON': 'Hierro',
-      },
-      'rim_is_set': {
-        'true': 'Juego completo',
-        'false': 'Unidad',
-      },
+      'letter_color': {'BLACK': 'Negro', 'WHITE': 'Blanco'},
+      'rim_material': {'ALUMINUM': 'Aluminio', 'IRON': 'Hierro'},
+      'rim_is_set': {'true': 'Juego completo', 'false': 'Unidad'},
     };
 
     final translated = fieldTranslations[fieldKey]?[option.value];

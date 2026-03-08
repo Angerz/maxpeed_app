@@ -15,7 +15,7 @@ class TireInventoryCard extends StatelessWidget {
   final VoidCallback? onAdd;
 
   String get _logoAsset {
-    final normalized = item.brand.toLowerCase().replaceAll(' ', '_');
+    final normalized = item.brand.toLowerCase().replaceAll(' ', '');
     return 'assets/brands/$normalized.png';
   }
 
@@ -81,7 +81,10 @@ class TireInventoryCard extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(item.details, style: theme.textTheme.bodyMedium),
                     const SizedBox(height: 2),
-                    Text(item.owner?.name ?? '-', style: theme.textTheme.bodyMedium),
+                    Text(
+                      item.owner?.name ?? '-',
+                      style: theme.textTheme.bodyMedium,
+                    ),
                     const SizedBox(height: 12),
                     Align(
                       alignment: Alignment.centerRight,

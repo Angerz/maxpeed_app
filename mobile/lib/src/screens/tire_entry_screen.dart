@@ -408,15 +408,6 @@ class _TireEntryFormState extends State<_TireEntryForm> {
               },
             ),
             const SizedBox(height: 12),
-            _buildChoiceField(
-              label: 'Aro',
-              fieldKey: 'rim_diameter',
-              items: choices.rimDiameters,
-              value: _selectedRimDiameter,
-              onChanged: (value) =>
-                  setState(() => _selectedRimDiameter = value),
-            ),
-            const SizedBox(height: 12),
             TextFormField(
               controller: _widthController,
               keyboardType: TextInputType.number,
@@ -437,6 +428,15 @@ class _TireEntryFormState extends State<_TireEntryForm> {
               ),
             ],
             const SizedBox(height: 12),
+            _buildChoiceField(
+              label: 'Aro',
+              fieldKey: 'rim_diameter',
+              items: choices.rimDiameters,
+              value: _selectedRimDiameter,
+              onChanged: (value) =>
+                  setState(() => _selectedRimDiameter = value),
+            ),
+            const SizedBox(height: 12),
             BrandAutocompleteField(
               controller: _brandController,
               initialValue: _selectedBrand,
@@ -444,6 +444,15 @@ class _TireEntryFormState extends State<_TireEntryForm> {
               onSelected: (brand) {
                 _selectedBrand = brand;
               },
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _modelController,
+              textInputAction: TextInputAction.done,
+              decoration: const InputDecoration(
+                labelText: 'Modelo',
+                hintText: 'Opcional',
+              ),
             ),
             const SizedBox(height: 12),
             _buildChoiceField(
@@ -521,15 +530,6 @@ class _TireEntryFormState extends State<_TireEntryForm> {
                 value,
                 'Precio sugerido de venta',
                 required: false,
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _modelController,
-              textInputAction: TextInputAction.done,
-              decoration: const InputDecoration(
-                labelText: 'Modelo',
-                hintText: 'Opcional',
               ),
             ),
             const SizedBox(height: 20),

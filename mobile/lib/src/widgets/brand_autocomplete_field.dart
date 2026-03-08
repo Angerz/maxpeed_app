@@ -99,45 +99,47 @@ class _BrandAutocompleteFieldState extends State<BrandAutocompleteField> {
         widget.controller.text = option.name;
         widget.onSelected(option);
       },
-      fieldViewBuilder: (context, textEditingController, focusNode, onFieldSubmitted) {
-        if (widget.controller.text.isNotEmpty &&
-            textEditingController.text != widget.controller.text) {
-          textEditingController.value = TextEditingValue(
-            text: widget.controller.text,
-            selection: TextSelection.collapsed(offset: widget.controller.text.length),
-          );
-        }
-
-        return TextFormField(
-          controller: textEditingController,
-          focusNode: focusNode,
-          textInputAction: TextInputAction.next,
-          decoration: InputDecoration(
-            labelText: 'Marca *',
-            hintText: 'Busca una marca',
-            suffixIcon: _isLoading
-                ? const Padding(
-                    padding: EdgeInsets.all(12),
-                    child: SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                  )
-                : const Icon(Icons.search),
-          ),
-          onChanged: (value) {
-            widget.controller.text = value;
-            widget.onSelected(null);
-          },
-          validator: (value) {
-            if (value == null || value.trim().isEmpty) {
-              return 'Selecciona una marca';
+      fieldViewBuilder:
+          (context, textEditingController, focusNode, onFieldSubmitted) {
+            if (textEditingController.text != widget.controller.text) {
+              textEditingController.value = TextEditingValue(
+                text: widget.controller.text,
+                selection: TextSelection.collapsed(
+                  offset: widget.controller.text.length,
+                ),
+              );
             }
-            return null;
+
+            return TextFormField(
+              controller: textEditingController,
+              focusNode: focusNode,
+              textInputAction: TextInputAction.next,
+              decoration: InputDecoration(
+                labelText: 'Marca *',
+                hintText: 'Busca una marca',
+                suffixIcon: _isLoading
+                    ? const Padding(
+                        padding: EdgeInsets.all(12),
+                        child: SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      )
+                    : const Icon(Icons.search),
+              ),
+              onChanged: (value) {
+                widget.controller.text = value;
+                widget.onSelected(null);
+              },
+              validator: (value) {
+                if (value == null || value.trim().isEmpty) {
+                  return 'Selecciona una marca';
+                }
+                return null;
+              },
+            );
           },
-        );
-      },
       optionsViewBuilder: (context, onSelected, options) {
         final optionsList = options.toList();
         return Align(

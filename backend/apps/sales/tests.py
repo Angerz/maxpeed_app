@@ -1,6 +1,9 @@
 from decimal import Decimal
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -210,3 +213,80 @@ class SaleApiTests(APITestCase):
         self.assertEqual(detail_response.data["id"], sale_id)
         self.assertEqual(len(detail_response.data["lines"]), 1)
         self.assertEqual(Decimal(detail_response.data["total_due"]), Decimal("30.00"))
+
+    def _create_summary_sale(self, *, sold_at, total):
+        return Sale.objects.create(
+            sold_at=sold_at,
+            status="CONFIRMED",
+            subtotal=Decimal(total),
+            discount_total=Decimal("0.00"),
+            tradein_credit_total=Decimal("0.00"),
+            total=Decimal(total),
+            total_due=Decimal(total),
+        )
+
+    def test_sales_list_without_filters_includes_summary(self):
+        self._create_summary_sale(sold_at=timezone.now(), total="100.00")
+
+        response = self.client.get(self.sales_url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("summary", response.data)
+        self.assertIn("total_revenue", response.data["summary"])
+
+    def test_sales_list_filters_last_two_days_by_lima_date(self):
+        lima_tz = ZoneInfo("America/Lima")
+        now_lima = timezone.now().astimezone(lima_tz)
+        today = now_lima.date()
+        yesterday = today - timedelta(days=1)
+        three_days_ago = today - timedelta(days=3)
+
+        self._create_summary_sale(
+            sold_at=datetime.combine(today, datetime.min.time(), tzinfo=lima_tz).replace(hour=12),
+            total="100.00",
+        )
+        self._create_summary_sale(
+            sold_at=datetime.combine(yesterday, datetime.min.time(), tzinfo=lima_tz).replace(hour=9),
+            total="200.00",
+        )
+        self._create_summary_sale(
+            sold_at=datetime.combine(three_days_ago, datetime.min.time(), tzinfo=lima_tz).replace(hour=15),
+            total="300.00",
+        )
+
+        response = self.client.get(
+            f"{self.sales_url}?start_date={yesterday.isoformat()}&end_date={today.isoformat()}"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 2)
+        self.assertEqual(response.data["summary"]["total_revenue"], "300.00")
+
+    def test_sales_list_returns_400_when_start_date_is_after_end_date(self):
+        response = self.client.get(f"{self.sales_url}?start_date=2026-03-10&end_date=2026-03-08")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_sales_summary_best_and_worst_day_are_correct(self):
+        lima_tz = ZoneInfo("America/Lima")
+        self._create_summary_sale(sold_at=datetime(2026, 3, 1, 10, 0, tzinfo=lima_tz), total="100.00")
+        self._create_summary_sale(sold_at=datetime(2026, 3, 1, 18, 0, tzinfo=lima_tz), total="40.00")
+        self._create_summary_sale(sold_at=datetime(2026, 3, 2, 11, 0, tzinfo=lima_tz), total="20.00")
+
+        response = self.client.get(f"{self.sales_url}?start_date=2026-03-01&end_date=2026-03-02")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["summary"]["total_revenue"], "160.00")
+        self.assertEqual(response.data["summary"]["best_day"]["date"], "2026-03-01")
+        self.assertEqual(response.data["summary"]["best_day"]["total"], "140.00")
+        self.assertEqual(response.data["summary"]["best_day"]["sales_count"], 2)
+        self.assertEqual(response.data["summary"]["worst_day"]["date"], "2026-03-02")
+        self.assertEqual(response.data["summary"]["worst_day"]["total"], "20.00")
+        self.assertEqual(response.data["summary"]["worst_day"]["sales_count"], 1)
+
+    def test_sales_list_results_are_sorted_desc_by_sold_at(self):
+        lima_tz = ZoneInfo("America/Lima")
+        older = self._create_summary_sale(sold_at=datetime(2026, 3, 1, 8, 0, tzinfo=lima_tz), total="10.00")
+        newer = self._create_summary_sale(sold_at=datetime(2026, 3, 3, 8, 0, tzinfo=lima_tz), total="20.00")
+
+        response = self.client.get(self.sales_url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        result_ids = [item["id"] for item in response.data["results"]]
+        self.assertTrue(result_ids.index(newer.id) < result_ids.index(older.id))

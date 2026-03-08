@@ -150,6 +150,20 @@ class SaleListSerializer(serializers.ModelSerializer):
         return obj.created_by.get_username()
 
 
+class SaleSummaryDaySerializer(serializers.Serializer):
+    date = serializers.DateField()
+    total = serializers.DecimalField(max_digits=12, decimal_places=2)
+    sales_count = serializers.IntegerField()
+
+
+class SaleSummarySerializer(serializers.Serializer):
+    start_date = serializers.DateField(allow_null=True)
+    end_date = serializers.DateField(allow_null=True)
+    total_revenue = serializers.DecimalField(max_digits=12, decimal_places=2)
+    best_day = SaleSummaryDaySerializer(allow_null=True)
+    worst_day = SaleSummaryDaySerializer(allow_null=True)
+
+
 class SaleLineSerializer(serializers.ModelSerializer):
     class Meta:
         model = SaleLine

@@ -129,7 +129,7 @@ class _SaleDetailPanelState extends State<SaleDetailPanel> {
                     Text('Subtotal: ${_asMoney(detail.subtotal)}'),
                     Text('Descuento: ${_asMoney(detail.discountTotal)}'),
                     Text(
-                      'Crédito trade-in: ${_asMoney(detail.tradeinCreditTotal)}',
+                      'Crédito (parte de pago): ${_asMoney(detail.tradeinCreditTotal)}',
                     ),
                     Text('Total: ${_asMoney(detail.total)}'),
                     Text(
@@ -138,7 +138,7 @@ class _SaleDetailPanelState extends State<SaleDetailPanel> {
                     ),
                     const Divider(height: 24),
                     Text(
-                      'Líneas',
+                      'Movimientos',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w700,
                       ),
@@ -168,9 +168,9 @@ class _SaleDetailPanelState extends State<SaleDetailPanel> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    line.description.isEmpty
+                                    line.code.isEmpty
                                         ? '-'
-                                        : line.description,
+                                        : line.code,
                                     style: Theme.of(context)
                                         .textTheme
                                         .titleSmall
@@ -178,7 +178,7 @@ class _SaleDetailPanelState extends State<SaleDetailPanel> {
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    '${line.lineType} | Cant: ${line.quantity}',
+                                    '${line.brand} | Cant: ${line.quantity}',
                                   ),
                                 ],
                               ),
