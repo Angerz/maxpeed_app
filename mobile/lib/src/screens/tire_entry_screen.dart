@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../models/brand_option.dart';
 import '../models/catalog_choice_option.dart';
@@ -7,6 +8,7 @@ import '../models/catalog_choices.dart';
 import '../models/owner.dart';
 import '../models/rim_receipt_request.dart';
 import '../services/catalog_api_service.dart';
+import '../services/rim_photo_storage.dart';
 import '../widgets/brand_autocomplete_field.dart';
 
 enum EntryMode { tire, rim }
@@ -157,7 +159,9 @@ class _TireEntryFormState extends State<_TireEntryForm> {
   @override
   void initState() {
     super.initState();
-    _selectedOwner = widget.choices.owners.isNotEmpty ? widget.choices.owners.first : null;
+    _selectedOwner = widget.choices.owners.isNotEmpty
+        ? widget.choices.owners.first
+        : null;
   }
 
   @override
@@ -237,7 +241,9 @@ class _TireEntryFormState extends State<_TireEntryForm> {
         _selectedTreadType == null ||
         _selectedLetterColor == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Completa todos los selectores obligatorios.')),
+        const SnackBar(
+          content: Text('Completa todos los selectores obligatorios.'),
+        ),
       );
       return;
     }
@@ -257,13 +263,21 @@ class _TireEntryFormState extends State<_TireEntryForm> {
         treadType: _selectedTreadType!.value,
         letterColor: _selectedLetterColor!.value,
         width: int.parse(_widthController.text.trim()),
-        aspectRatio: _showProfileField ? int.parse(_profileController.text.trim()) : null,
+        aspectRatio: _showProfileField
+            ? int.parse(_profileController.text.trim())
+            : null,
         quantity: int.parse(_quantityController.text.trim()),
-        unitPurchasePrice: double.parse(_priceController.text.trim()).toStringAsFixed(2),
+        unitPurchasePrice: double.parse(
+          _priceController.text.trim(),
+        ).toStringAsFixed(2),
         recommendedSalePrice: _suggestedPriceController.text.trim().isEmpty
             ? null
-            : double.parse(_suggestedPriceController.text.trim()).toStringAsFixed(2),
-        model: _modelController.text.trim().isEmpty ? null : _modelController.text.trim(),
+            : double.parse(
+                _suggestedPriceController.text.trim(),
+              ).toStringAsFixed(2),
+        model: _modelController.text.trim().isEmpty
+            ? null
+            : _modelController.text.trim(),
       );
 
       if (!mounted) {
@@ -274,7 +288,9 @@ class _TireEntryFormState extends State<_TireEntryForm> {
       final stockAfter = response['stock_after'];
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Ingreso de llanta registrado. Recibo #$receiptId | Stock: $stockAfter'),
+          content: Text(
+            'Ingreso de llanta registrado. Recibo #$receiptId | Stock: $stockAfter',
+          ),
         ),
       );
 
@@ -284,8 +300,12 @@ class _TireEntryFormState extends State<_TireEntryForm> {
         return;
       }
 
-      final message = error is ApiException ? error.message : 'No se pudo registrar el ingreso.';
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+      final message = error is ApiException
+          ? error.message
+          : 'No se pudo registrar el ingreso.';
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
     } finally {
       if (mounted) {
         setState(() {
@@ -307,7 +327,9 @@ class _TireEntryFormState extends State<_TireEntryForm> {
 
     setState(() {
       _selectedBrand = null;
-      _selectedOwner = widget.choices.owners.isNotEmpty ? widget.choices.owners.first : null;
+      _selectedOwner = widget.choices.owners.isNotEmpty
+          ? widget.choices.owners.first
+          : null;
       _selectedTireType = null;
       _selectedRimDiameter = null;
       _selectedOrigin = null;
@@ -360,7 +382,12 @@ class _TireEntryFormState extends State<_TireEntryForm> {
               value: _selectedOwner,
               decoration: const InputDecoration(labelText: 'Dueño *'),
               items: choices.owners
-                  .map((owner) => DropdownMenuItem<Owner>(value: owner, child: Text(owner.name)))
+                  .map(
+                    (owner) => DropdownMenuItem<Owner>(
+                      value: owner,
+                      child: Text(owner.name),
+                    ),
+                  )
                   .toList(),
               onChanged: (owner) => setState(() => _selectedOwner = owner),
               validator: (value) => value == null ? 'Selecciona Dueño' : null,
@@ -386,7 +413,8 @@ class _TireEntryFormState extends State<_TireEntryForm> {
               fieldKey: 'rim_diameter',
               items: choices.rimDiameters,
               value: _selectedRimDiameter,
-              onChanged: (value) => setState(() => _selectedRimDiameter = value),
+              onChanged: (value) =>
+                  setState(() => _selectedRimDiameter = value),
             ),
             const SizedBox(height: 12),
             TextFormField(
@@ -447,7 +475,8 @@ class _TireEntryFormState extends State<_TireEntryForm> {
               fieldKey: 'letter_color',
               items: choices.letterColors,
               value: _selectedLetterColor,
-              onChanged: (value) => setState(() => _selectedLetterColor = value),
+              onChanged: (value) =>
+                  setState(() => _selectedLetterColor = value),
             ),
             const SizedBox(height: 12),
             TextFormField(
@@ -461,29 +490,47 @@ class _TireEntryFormState extends State<_TireEntryForm> {
             const SizedBox(height: 12),
             TextFormField(
               controller: _priceController,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+              ],
               textInputAction: TextInputAction.next,
-              decoration: const InputDecoration(labelText: 'Precio de compra *'),
-              validator: (value) => _decimalValidator(value, 'Precio de compra'),
+              decoration: const InputDecoration(
+                labelText: 'Precio de compra *',
+              ),
+              validator: (value) =>
+                  _decimalValidator(value, 'Precio de compra'),
             ),
             const SizedBox(height: 12),
             TextFormField(
               controller: _suggestedPriceController,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+              ],
               textInputAction: TextInputAction.next,
               decoration: const InputDecoration(
                 labelText: 'Precio sugerido de venta',
                 hintText: 'Opcional',
               ),
-              validator: (value) => _decimalValidator(value, 'Precio sugerido de venta', required: false),
+              validator: (value) => _decimalValidator(
+                value,
+                'Precio sugerido de venta',
+                required: false,
+              ),
             ),
             const SizedBox(height: 12),
             TextFormField(
               controller: _modelController,
               textInputAction: TextInputAction.done,
-              decoration: const InputDecoration(labelText: 'Modelo', hintText: 'Opcional'),
+              decoration: const InputDecoration(
+                labelText: 'Modelo',
+                hintText: 'Opcional',
+              ),
             ),
             const SizedBox(height: 20),
             FilledButton.icon(
@@ -516,6 +563,8 @@ class _RimEntryForm extends StatefulWidget {
 
 class _RimEntryFormState extends State<_RimEntryForm> {
   final _formKey = GlobalKey<FormState>();
+  final _imagePicker = ImagePicker();
+  final _photoStorage = createRimPhotoStorage();
   final _internalCodeController = TextEditingController();
   final _quantityController = TextEditingController();
   final _priceController = TextEditingController();
@@ -534,11 +583,15 @@ class _RimEntryFormState extends State<_RimEntryForm> {
   bool _isLoadingBrands = true;
   String? _brandsError;
   bool _isSubmitting = false;
+  XFile? _selectedPhoto;
+  Uint8List? _selectedPhotoBytes;
 
   @override
   void initState() {
     super.initState();
-    _selectedOwner = widget.choices.owners.isNotEmpty ? widget.choices.owners.first : null;
+    _selectedOwner = widget.choices.owners.isNotEmpty
+        ? widget.choices.owners.first
+        : null;
     _loadRimBrands();
   }
 
@@ -589,7 +642,11 @@ class _RimEntryFormState extends State<_RimEntryForm> {
     return null;
   }
 
-  String? _positiveIntValidator(String? value, String fieldName, {bool required = true}) {
+  String? _positiveIntValidator(
+    String? value,
+    String fieldName, {
+    bool required = true,
+  }) {
     if (!required && (value == null || value.trim().isEmpty)) {
       return null;
     }
@@ -600,7 +657,11 @@ class _RimEntryFormState extends State<_RimEntryForm> {
     return null;
   }
 
-  String? _positiveDecimalValidator(String? value, String fieldName, {bool required = true}) {
+  String? _positiveDecimalValidator(
+    String? value,
+    String fieldName, {
+    bool required = true,
+  }) {
     if (!required && (value == null || value.trim().isEmpty)) {
       return null;
     }
@@ -629,7 +690,9 @@ class _RimEntryFormState extends State<_RimEntryForm> {
         _selectedWidth == null ||
         _selectedMaterial == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Completa todos los selectores obligatorios.')),
+        const SnackBar(
+          content: Text('Completa todos los selectores obligatorios.'),
+        ),
       );
       return;
     }
@@ -640,11 +703,12 @@ class _RimEntryFormState extends State<_RimEntryForm> {
       _isSubmitting = true;
     });
 
+    final internalCode = _internalCodeController.text.trim();
     try {
       final request = RimReceiptRequest(
         ownerId: _selectedOwner!.id,
         brandId: _selectedBrand!.id,
-        internalCode: _internalCodeController.text.trim(),
+        internalCode: internalCode,
         rimDiameter: _selectedDiameter!.value,
         holes: int.parse(_selectedHoles!.value),
         widthIn: int.parse(_selectedWidth!.value),
@@ -655,10 +719,19 @@ class _RimEntryFormState extends State<_RimEntryForm> {
         suggestedSalePrice: _suggestedPriceController.text.trim().isEmpty
             ? null
             : _toPrice(_suggestedPriceController.text),
-        notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
+        notes: _notesController.text.trim().isEmpty
+            ? null
+            : _notesController.text.trim(),
       );
 
       await widget.apiService.postRimReceipt(request);
+      if (_selectedPhotoBytes != null &&
+          _photoStorage.supportsPersistentStorage) {
+        await _photoStorage.savePhotoBytes(
+          internalCode: internalCode,
+          bytes: _selectedPhotoBytes!,
+        );
+      }
 
       if (!mounted) {
         return;
@@ -672,8 +745,12 @@ class _RimEntryFormState extends State<_RimEntryForm> {
       if (!mounted) {
         return;
       }
-      final message = error is ApiException ? error.message : 'No se pudo registrar el ingreso de aro.';
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+      final message = error is ApiException
+          ? error.message
+          : 'No se pudo registrar el ingreso de aro.';
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
     } finally {
       if (mounted) {
         setState(() {
@@ -691,14 +768,53 @@ class _RimEntryFormState extends State<_RimEntryForm> {
     _suggestedPriceController.clear();
     _notesController.clear();
     setState(() {
-      _selectedOwner = widget.choices.owners.isNotEmpty ? widget.choices.owners.first : null;
+      _selectedOwner = widget.choices.owners.isNotEmpty
+          ? widget.choices.owners.first
+          : null;
       _selectedBrand = null;
       _selectedDiameter = null;
       _selectedHoles = null;
       _selectedWidth = null;
       _selectedMaterial = null;
       _isSet = false;
+      _selectedPhoto = null;
+      _selectedPhotoBytes = null;
     });
+  }
+
+  Future<void> _pickPhoto(ImageSource source) async {
+    final code = _internalCodeController.text.trim();
+    if (code.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Primero ingresa el código del aro')),
+      );
+      return;
+    }
+
+    try {
+      final picked = await _imagePicker.pickImage(
+        source: source,
+        imageQuality: 85,
+      );
+      if (picked == null) {
+        return;
+      }
+      final bytes = await picked.readAsBytes();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _selectedPhoto = picked;
+        _selectedPhotoBytes = bytes;
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No se pudo seleccionar la foto')),
+      );
+    }
   }
 
   @override
@@ -714,9 +830,15 @@ class _RimEntryFormState extends State<_RimEntryForm> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('No se pudieron cargar marcas de aros.\n$_brandsError', textAlign: TextAlign.center),
+              Text(
+                'No se pudieron cargar marcas de aros.\n$_brandsError',
+                textAlign: TextAlign.center,
+              ),
               const SizedBox(height: 16),
-              FilledButton(onPressed: _loadRimBrands, child: const Text('Reintentar')),
+              FilledButton(
+                onPressed: _loadRimBrands,
+                child: const Text('Reintentar'),
+              ),
             ],
           ),
         ),
@@ -764,7 +886,91 @@ class _RimEntryFormState extends State<_RimEntryForm> {
               controller: _internalCodeController,
               textInputAction: TextInputAction.next,
               decoration: const InputDecoration(labelText: 'Código interno *'),
-              validator: (value) => _requiredTextValidator(value, 'Código interno'),
+              validator: (value) =>
+                  _requiredTextValidator(value, 'Código interno'),
+            ),
+            const SizedBox(height: 12),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'Foto (opcional)',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    if (!_photoStorage.supportsPersistentStorage)
+                      const Text(
+                        'Guardado local disponible solo en dispositivo móvil.',
+                      ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed:
+                                !_photoStorage.supportsPersistentStorage ||
+                                    _isSubmitting
+                                ? null
+                                : () => _pickPhoto(ImageSource.camera),
+                            icon: const Icon(Icons.camera_alt_outlined),
+                            label: const Text('Tomar foto'),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed:
+                                !_photoStorage.supportsPersistentStorage ||
+                                    _isSubmitting
+                                ? null
+                                : () => _pickPhoto(ImageSource.gallery),
+                            icon: const Icon(Icons.photo_library_outlined),
+                            label: const Text('Elegir de galería'),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (_selectedPhotoBytes != null) ...[
+                      const SizedBox(height: 10),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image.memory(
+                          _selectedPhotoBytes!,
+                          height: 140,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              _selectedPhoto?.name ?? 'Foto seleccionada',
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          TextButton.icon(
+                            onPressed: _isSubmitting
+                                ? null
+                                : () {
+                                    setState(() {
+                                      _selectedPhoto = null;
+                                      _selectedPhotoBytes = null;
+                                    });
+                                  },
+                            icon: const Icon(Icons.delete_outline),
+                            label: const Text('Quitar'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<CatalogChoiceOption>(
@@ -779,12 +985,15 @@ class _RimEntryFormState extends State<_RimEntryForm> {
                   )
                   .toList(),
               onChanged: (value) => setState(() => _selectedDiameter = value),
-              validator: (value) => value == null ? 'Selecciona Diámetro' : null,
+              validator: (value) =>
+                  value == null ? 'Selecciona Diámetro' : null,
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<CatalogChoiceOption>(
               value: _selectedHoles,
-              decoration: const InputDecoration(labelText: 'Número de huecos *'),
+              decoration: const InputDecoration(
+                labelText: 'Número de huecos *',
+              ),
               items: widget.choices.rimHoles
                   .map(
                     (option) => DropdownMenuItem<CatalogChoiceOption>(
@@ -794,7 +1003,8 @@ class _RimEntryFormState extends State<_RimEntryForm> {
                   )
                   .toList(),
               onChanged: (value) => setState(() => _selectedHoles = value),
-              validator: (value) => value == null ? 'Selecciona Número de huecos' : null,
+              validator: (value) =>
+                  value == null ? 'Selecciona Número de huecos' : null,
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<CatalogChoiceOption>(
@@ -819,12 +1029,18 @@ class _RimEntryFormState extends State<_RimEntryForm> {
                   .map(
                     (option) => DropdownMenuItem<CatalogChoiceOption>(
                       value: option,
-                      child: Text(widget.apiService.translateLabel('rim_material', option)),
+                      child: Text(
+                        widget.apiService.translateLabel(
+                          'rim_material',
+                          option,
+                        ),
+                      ),
                     ),
                   )
                   .toList(),
               onChanged: (value) => setState(() => _selectedMaterial = value),
-              validator: (value) => value == null ? 'Selecciona Material' : null,
+              validator: (value) =>
+                  value == null ? 'Selecciona Material' : null,
             ),
             const SizedBox(height: 8),
             CheckboxListTile(
@@ -850,7 +1066,9 @@ class _RimEntryFormState extends State<_RimEntryForm> {
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
               textInputAction: TextInputAction.next,
               decoration: InputDecoration(
-                labelText: _isSet ? 'Cantidad (fijada en 1 por juego)' : 'Cantidad *',
+                labelText: _isSet
+                    ? 'Cantidad (fijada en 1 por juego)'
+                    : 'Cantidad *',
               ),
               validator: (value) => _isSet
                   ? null
@@ -859,30 +1077,48 @@ class _RimEntryFormState extends State<_RimEntryForm> {
             const SizedBox(height: 12),
             TextFormField(
               controller: _priceController,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+              ],
               textInputAction: TextInputAction.next,
-              decoration: const InputDecoration(labelText: 'Precio compra unitario *'),
-              validator: (value) => _positiveDecimalValidator(value, 'Precio compra unitario'),
+              decoration: const InputDecoration(
+                labelText: 'Precio compra unitario *',
+              ),
+              validator: (value) =>
+                  _positiveDecimalValidator(value, 'Precio compra unitario'),
             ),
             const SizedBox(height: 12),
             TextFormField(
               controller: _suggestedPriceController,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+              ],
               textInputAction: TextInputAction.next,
               decoration: const InputDecoration(
                 labelText: 'Precio sugerido',
                 hintText: 'Opcional (vacío = null)',
               ),
-              validator: (value) => _positiveDecimalValidator(value, 'Precio sugerido', required: false),
+              validator: (value) => _positiveDecimalValidator(
+                value,
+                'Precio sugerido',
+                required: false,
+              ),
             ),
             const SizedBox(height: 12),
             TextFormField(
               controller: _notesController,
               maxLines: 2,
               textInputAction: TextInputAction.done,
-              decoration: const InputDecoration(labelText: 'Notas', hintText: 'Opcional'),
+              decoration: const InputDecoration(
+                labelText: 'Notas',
+                hintText: 'Opcional',
+              ),
             ),
             const SizedBox(height: 20),
             FilledButton.icon(

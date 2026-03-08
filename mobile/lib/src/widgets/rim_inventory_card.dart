@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 
 import '../models/rim_inventory_card_item.dart';
@@ -6,11 +7,13 @@ class RimInventoryCard extends StatelessWidget {
   const RimInventoryCard({
     super.key,
     required this.item,
+    this.photoBytes,
     this.onTap,
     this.onAdd,
   });
 
   final RimInventoryCardItem item;
+  final Uint8List? photoBytes;
   final VoidCallback? onTap;
   final VoidCallback? onAdd;
 
@@ -40,12 +43,21 @@ class RimInventoryCard extends StatelessWidget {
                     alignment: Alignment.centerRight,
                     child: FractionallySizedBox(
                       widthFactor: 0.85,
-                      child: Image.asset(
-                        _logoAsset,
-                        fit: BoxFit.contain,
-                        alignment: Alignment.centerRight,
-                        errorBuilder: (_, __, ___) => _BrandPlaceholder(brand: item.brand),
-                      ),
+                      child: photoBytes != null
+                          ? Image.memory(
+                              photoBytes!,
+                              fit: BoxFit.cover,
+                              alignment: Alignment.centerRight,
+                              errorBuilder: (_, __, ___) =>
+                                  _BrandPlaceholder(brand: item.brand),
+                            )
+                          : Image.asset(
+                              _logoAsset,
+                              fit: BoxFit.contain,
+                              alignment: Alignment.centerRight,
+                              errorBuilder: (_, __, ___) =>
+                                  _BrandPlaceholder(brand: item.brand),
+                            ),
                     ),
                   ),
                 ),
@@ -57,12 +69,16 @@ class RimInventoryCard extends StatelessWidget {
                   children: [
                     Text(
                       item.internalCode,
-                      style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
+                      style: theme.textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                     const SizedBox(height: 6),
                     Text(
                       item.brand,
-                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     Text(
@@ -75,7 +91,10 @@ class RimInventoryCard extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(item.details, style: theme.textTheme.bodyMedium),
                     const SizedBox(height: 2),
-                    Text(item.owner?.name ?? '-', style: theme.textTheme.bodyMedium),
+                    Text(
+                      item.owner?.name ?? '-',
+                      style: theme.textTheme.bodyMedium,
+                    ),
                     const SizedBox(height: 12),
                     Align(
                       alignment: Alignment.centerRight,
@@ -119,7 +138,9 @@ class _BrandPlaceholder extends StatelessWidget {
           Text(
             brand,
             textAlign: TextAlign.center,
-            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ],
       ),

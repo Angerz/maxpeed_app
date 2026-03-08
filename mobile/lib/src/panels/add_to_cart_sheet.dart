@@ -2,10 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 class AddToCartResult {
-  const AddToCartResult({
-    required this.quantity,
-    required this.unitPrice,
-  });
+  const AddToCartResult({required this.quantity, required this.unitPrice});
 
   final int quantity;
   final double unitPrice;
@@ -17,11 +14,13 @@ class AddToCartSheet extends StatefulWidget {
     required this.title,
     required this.stock,
     this.suggestedPrice,
+    this.loadSuggestedPrice,
   });
 
   final String title;
   final int stock;
   final double? suggestedPrice;
+  final Future<double?> Function()? loadSuggestedPrice;
 
   @override
   State<AddToCartSheet> createState() => _AddToCartSheetState();
@@ -31,14 +30,20 @@ class _AddToCartSheetState extends State<AddToCartSheet> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _quantityController;
   late final TextEditingController _priceController;
+  bool _loadingSuggested = false;
+  double? _suggestedPrice;
 
   @override
   void initState() {
     super.initState();
+    _suggestedPrice = widget.suggestedPrice;
     _quantityController = TextEditingController(text: '1');
     _priceController = TextEditingController(
-      text: widget.suggestedPrice != null ? widget.suggestedPrice!.toStringAsFixed(2) : '',
+      text: _suggestedPrice != null ? _suggestedPrice!.toStringAsFixed(2) : '',
     );
+    if (_suggestedPrice == null && widget.loadSuggestedPrice != null) {
+      _resolveSuggestedPrice();
+    }
   }
 
   @override
@@ -50,9 +55,39 @@ class _AddToCartSheetState extends State<AddToCartSheet> {
 
   int get _quantity => int.tryParse(_quantityController.text.trim()) ?? 0;
 
+  Future<void> _resolveSuggestedPrice() async {
+    setState(() {
+      _loadingSuggested = true;
+    });
+
+    try {
+      final suggested = await widget.loadSuggestedPrice!.call();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _suggestedPrice = suggested;
+        if (suggested != null && _priceController.text.trim().isEmpty) {
+          _priceController.text = suggested.toStringAsFixed(2);
+        }
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loadingSuggested = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final overStock = _quantity > widget.stock;
+    final suggestedText = _loadingSuggested
+        ? 'cargando...'
+        : _suggestedPrice != null
+        ? 'S/ ${_suggestedPrice!.toStringAsFixed(2)}'
+        : '—';
 
     return SafeArea(
       child: Padding(
@@ -91,18 +126,31 @@ class _AddToCartSheetState extends State<AddToCartSheet> {
                   padding: const EdgeInsets.only(top: 6),
                   child: Text(
                     'Advertencia: la cantidad supera el stock disponible.',
-                    style: TextStyle(color: Theme.of(context).colorScheme.error),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
                   ),
                 ),
               const SizedBox(height: 12),
+              Text(
+                'Precio sugerido: $suggestedText',
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 8),
               TextFormField(
                 controller: _priceController,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+                ],
                 decoration: InputDecoration(
                   labelText: 'Precio unitario *',
-                  hintText: widget.suggestedPrice != null
-                      ? 'Precio sugerido: ${widget.suggestedPrice!.toStringAsFixed(2)}'
+                  hintText: _suggestedPrice != null
+                      ? 'Precio sugerido: ${_suggestedPrice!.toStringAsFixed(2)}'
                       : 'Ingresa precio',
                 ),
                 validator: (value) {
@@ -138,4 +186,3 @@ class _AddToCartSheetState extends State<AddToCartSheet> {
     );
   }
 }
-

@@ -8,7 +8,7 @@ from apps.inventory.models import Owner
 from .models import Brand
 from .serializers import BrandSerializer, CatalogChoicesSerializer, CatalogServiceSerializer
 
-RIM_BRAND_NAMES = ["ROMAX", "HCW", "URD", "ZEHLENDORF"]
+RIM_BRAND_NAMES = ["ROMAX", "HCW", "URD", "ZEHLENDORF", "FUEL"]
 
 
 class CatalogChoicesAPIView(APIView):

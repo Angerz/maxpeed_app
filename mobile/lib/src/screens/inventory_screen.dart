@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 
 import '../models/inventory_card_item.dart';
@@ -9,6 +10,7 @@ import '../panels/add_to_cart_sheet.dart';
 import '../panels/inventory_detail_sheet.dart';
 import '../panels/rim_detail_sheet.dart';
 import '../services/catalog_api_service.dart';
+import '../services/rim_photo_storage.dart';
 import '../store/cart_store.dart';
 import '../widgets/rim_inventory_card.dart';
 import '../widgets/tire_inventory_card.dart';
@@ -27,6 +29,9 @@ class InventoryScreen extends StatefulWidget {
 class _InventoryScreenState extends State<InventoryScreen> {
   final _searchController = TextEditingController();
   final _apiService = CatalogApiService();
+  final _rimPhotoStorage = createRimPhotoStorage();
+  final Map<int, double?> _tireSuggestedPriceCache = <int, double?>{};
+  final Map<String, Uint8List?> _rimPhotoCache = <String, Uint8List?>{};
 
   InventoryViewMode _mode = InventoryViewMode.tires;
   bool _includeZeroStock = false;
@@ -57,7 +62,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
     });
 
     try {
-      final response = await _apiService.fetchInventory(includeZeroStock: _includeZeroStock);
+      final response = await _apiService.fetchInventory(
+        includeZeroStock: _includeZeroStock,
+      );
       if (!mounted) {
         return;
       }
@@ -88,6 +95,10 @@ class _InventoryScreenState extends State<InventoryScreen> {
 
     try {
       final response = await _apiService.fetchRimsInventory();
+      if (!mounted) {
+        return;
+      }
+      await _warmRimPhotoCache(response);
       if (!mounted) {
         return;
       }
@@ -127,7 +138,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
     return sorted;
   }
 
-  List<InventoryCardItem> _filterAndSortTireItems(List<InventoryCardItem> items) {
+  List<InventoryCardItem> _filterAndSortTireItems(
+    List<InventoryCardItem> items,
+  ) {
     final sorted = List<InventoryCardItem>.from(items)
       ..sort((a, b) => a.code.compareTo(b.code));
 
@@ -136,10 +149,14 @@ class _InventoryScreenState extends State<InventoryScreen> {
       return sorted;
     }
 
-    return sorted.where((item) => item.code.toLowerCase().contains(query)).toList();
+    return sorted
+        .where((item) => item.code.toLowerCase().contains(query))
+        .toList();
   }
 
-  List<RimInventoryCardItem> _filterAndSortRimItems(List<RimInventoryCardItem> items) {
+  List<RimInventoryCardItem> _filterAndSortRimItems(
+    List<RimInventoryCardItem> items,
+  ) {
     final sorted = List<RimInventoryCardItem>.from(items)
       ..sort((a, b) => a.internalCode.compareTo(b.internalCode));
 
@@ -148,7 +165,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
       return sorted;
     }
 
-    return sorted.where((item) => item.internalCode.toLowerCase().contains(query)).toList();
+    return sorted
+        .where((item) => item.internalCode.toLowerCase().contains(query))
+        .toList();
   }
 
   void _openTireDetail(InventoryCardItem item) {
@@ -168,10 +187,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
-      builder: (_) => RimDetailSheet(
-        item: item,
-        apiService: _apiService,
-      ),
+      builder: (_) => RimDetailSheet(item: item, apiService: _apiService),
     );
 
     if (deactivated == true && mounted) {
@@ -180,6 +196,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
   }
 
   Future<void> _addTireToCart(InventoryCardItem item) async {
+    final cachedSuggested = _tireSuggestedPriceCache[item.inventoryItemId];
     final result = await showModalBottomSheet<AddToCartResult>(
       context: context,
       isScrollControlled: true,
@@ -187,6 +204,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
       builder: (_) => AddToCartSheet(
         title: 'Agregar llanta ${item.code}',
         stock: item.stock,
+        suggestedPrice: cachedSuggested,
+        loadSuggestedPrice: () =>
+            _resolveTireSuggestedPrice(item.inventoryItemId),
       ),
     );
 
@@ -241,6 +261,43 @@ class _InventoryScreenState extends State<InventoryScreen> {
     );
   }
 
+  Future<double?> _resolveTireSuggestedPrice(int inventoryItemId) async {
+    if (_tireSuggestedPriceCache.containsKey(inventoryItemId)) {
+      return _tireSuggestedPriceCache[inventoryItemId];
+    }
+
+    try {
+      final detail = await _apiService.fetchInventoryDetail(inventoryItemId);
+      final parsed = double.tryParse(detail.suggestedSalePrice.trim());
+      _tireSuggestedPriceCache[inventoryItemId] = parsed;
+      return parsed;
+    } catch (_) {
+      _tireSuggestedPriceCache[inventoryItemId] = null;
+      return null;
+    }
+  }
+
+  Future<void> _warmRimPhotoCache(RimGroupedResponse response) async {
+    if (!_rimPhotoStorage.supportsPersistentStorage) {
+      return;
+    }
+    final codes = response.groups.values
+        .expand((items) => items)
+        .map((item) => sanitizeRimCode(item.internalCode))
+        .where((code) => code.isNotEmpty)
+        .toSet();
+    if (codes.isEmpty) {
+      return;
+    }
+
+    await Future.wait(
+      codes.map((code) async {
+        final bytes = await _rimPhotoStorage.readPhotoBytes(code);
+        _rimPhotoCache[code] = bytes;
+      }),
+    );
+  }
+
   Widget _buildHeaderControls() {
     return Column(
       children: [
@@ -252,10 +309,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 value: InventoryViewMode.tires,
                 label: Text('Llantas'),
               ),
-              ButtonSegment(
-                value: InventoryViewMode.rims,
-                label: Text('Aros'),
-              ),
+              ButtonSegment(value: InventoryViewMode.rims, label: Text('Aros')),
             ],
             selected: {_mode},
             onSelectionChanged: (value) {
@@ -340,10 +394,14 @@ class _InventoryScreenState extends State<InventoryScreen> {
     }
 
     if (_tiresError != null) {
-      return _buildError('No se pudo cargar inventario de llantas.\n$_tiresError', _fetchTires);
+      return _buildError(
+        'No se pudo cargar inventario de llantas.\n$_tiresError',
+        _fetchTires,
+      );
     }
 
-    final groups = _tiresInventory?.groups ?? const <String, List<InventoryCardItem>>{};
+    final groups =
+        _tiresInventory?.groups ?? const <String, List<InventoryCardItem>>{};
     final groupKeys = _sortGroupKeys(groups.keys);
 
     if (groupKeys.isEmpty) {
@@ -363,7 +421,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 2),
             child: Text(
               key,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
             ),
           ),
           ...items.map(
@@ -384,10 +444,14 @@ class _InventoryScreenState extends State<InventoryScreen> {
     }
 
     if (_rimsError != null) {
-      return _buildError('No se pudo cargar inventario de aros.\n$_rimsError', _fetchRims);
+      return _buildError(
+        'No se pudo cargar inventario de aros.\n$_rimsError',
+        _fetchRims,
+      );
     }
 
-    final groups = _rimsInventory?.groups ?? const <String, List<RimInventoryCardItem>>{};
+    final groups =
+        _rimsInventory?.groups ?? const <String, List<RimInventoryCardItem>>{};
     final groupKeys = _sortGroupKeys(groups.keys);
 
     if (groupKeys.isEmpty) {
@@ -407,12 +471,15 @@ class _InventoryScreenState extends State<InventoryScreen> {
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 2),
             child: Text(
               key,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
             ),
           ),
           ...items.map(
             (item) => RimInventoryCard(
               item: item,
+              photoBytes: _rimPhotoCache[sanitizeRimCode(item.internalCode)],
               onTap: () => _openRimPreview(item),
               onAdd: () => _addRimToCart(item),
             ),
@@ -429,7 +496,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
         _buildHeaderControls(),
         const SizedBox(height: 6),
         Expanded(
-          child: _mode == InventoryViewMode.tires ? _buildTiresList() : _buildRimsList(),
+          child: _mode == InventoryViewMode.tires
+              ? _buildTiresList()
+              : _buildRimsList(),
         ),
       ],
     );
