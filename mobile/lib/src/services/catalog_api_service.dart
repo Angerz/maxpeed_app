@@ -8,13 +8,19 @@ import '../models/catalog_choice_option.dart';
 import '../models/catalog_choices.dart';
 import '../models/inventory_detail.dart';
 import '../models/inventory_group_response.dart';
+import '../models/paginated_response.dart';
+import '../models/rim_grouped_response.dart';
+import '../models/rim_receipt_request.dart';
 import '../models/restock_request.dart';
 import '../models/restock_response.dart';
+import '../models/sale_models.dart';
+import '../models/service_option.dart';
 
 class ApiException implements Exception {
-  const ApiException(this.message);
+  const ApiException(this.message, {this.statusCode});
 
   final String message;
+  final int? statusCode;
 
   @override
   String toString() => message;
@@ -48,6 +54,21 @@ class CatalogApiService {
       '/api/catalog/brands/',
       trimmed.isEmpty ? null : {'search': trimmed},
     );
+    final response = await _getJson(uri);
+    final rawList = response is List
+        ? response
+        : response is Map<String, dynamic> && response['results'] is List
+            ? response['results'] as List
+            : <dynamic>[];
+
+    return rawList
+        .whereType<Map>()
+        .map((item) => BrandOption.fromJson(item.cast<String, dynamic>()))
+        .toList();
+  }
+
+  Future<List<BrandOption>> fetchRimBrands() async {
+    final uri = Uri.http('$host:$port', '/api/catalog/rim-brands/');
     final response = await _getJson(uri);
     final rawList = response is List
         ? response
@@ -173,6 +194,15 @@ class CatalogApiService {
     return InventoryGroupResponse.fromJson(response);
   }
 
+  Future<RimGroupedResponse> fetchRimsInventory() async {
+    final uri = Uri.http('$host:$port', '/api/inventory/rims/');
+    final response = await _getJson(uri);
+    if (response is! Map<String, dynamic>) {
+      throw const ApiException('Respuesta inválida al cargar inventario de aros');
+    }
+    return RimGroupedResponse.fromJson(response);
+  }
+
   Future<InventoryDetail> fetchInventoryDetail(int inventoryItemId) async {
     final uri = Uri.http('$host:$port', '/api/inventory/items/$inventoryItemId/');
     final response = await _getJson(uri);
@@ -220,6 +250,140 @@ class CatalogApiService {
     return RestockResponse.fromJson(decoded);
   }
 
+  Future<Map<String, dynamic>> postRimReceipt(RimReceiptRequest request) async {
+    final uri = Uri.http('$host:$port', '/api/inventory/rim-receipts/');
+
+    http.Response response;
+    try {
+      response = await _client
+          .post(
+            uri,
+            headers: const {'Content-Type': 'application/json'},
+            body: jsonEncode(request.toJson()),
+          )
+          .timeout(_requestTimeout, onTimeout: () {
+        throw const ApiException(
+          'Tiempo de espera agotado al registrar ingreso de aro. Verifica conexión y servidor.',
+        );
+      });
+    } on http.ClientException catch (error) {
+      throw ApiException('Error de conexión: ${error.message}');
+    } on TimeoutException {
+      throw const ApiException(
+        'Tiempo de espera agotado al registrar ingreso de aro. Verifica conexión y servidor.',
+      );
+    }
+
+    final decoded = _decodeResponse(response);
+    if (decoded is! Map<String, dynamic>) {
+      throw const ApiException('Respuesta inválida al registrar ingreso de aro');
+    }
+
+    return decoded;
+  }
+
+  Future<void> deactivateRim(int inventoryItemId, {String? reason}) async {
+    final uri = Uri.http('$host:$port', '/api/inventory/rims/$inventoryItemId/deactivate/');
+    final payload = reason == null || reason.trim().isEmpty
+        ? const <String, dynamic>{}
+        : <String, dynamic>{'reason': reason.trim()};
+
+    http.Response response;
+    try {
+      response = await _client
+          .post(
+            uri,
+            headers: const {'Content-Type': 'application/json'},
+            body: jsonEncode(payload),
+          )
+          .timeout(_requestTimeout, onTimeout: () {
+        throw const ApiException(
+          'Tiempo de espera agotado al desactivar aro. Verifica conexión y servidor.',
+        );
+      });
+    } on http.ClientException catch (error) {
+      throw ApiException('Error de conexión: ${error.message}');
+    } on TimeoutException {
+      throw const ApiException(
+        'Tiempo de espera agotado al desactivar aro. Verifica conexión y servidor.',
+      );
+    }
+
+    _decodeResponse(response);
+  }
+
+  Future<List<ServiceOption>> fetchServices() async {
+    final uri = Uri.http('$host:$port', '/api/catalog/services/');
+    final response = await _getJson(uri);
+    final rawList = response is List
+        ? response
+        : response is Map<String, dynamic> && response['results'] is List
+            ? response['results'] as List
+            : <dynamic>[];
+
+    return rawList
+        .map(ServiceOption.fromDynamic)
+        .where((option) => option.name.isNotEmpty)
+        .toList();
+  }
+
+  Future<SaleCreateResponse> createSale(SaleCreateRequest request) async {
+    final uri = Uri.http('$host:$port', '/api/sales/');
+
+    http.Response response;
+    try {
+      response = await _client
+          .post(
+            uri,
+            headers: const {'Content-Type': 'application/json'},
+            body: jsonEncode(request.toJson()),
+          )
+          .timeout(_requestTimeout, onTimeout: () {
+        throw const ApiException(
+          'Tiempo de espera agotado al registrar venta. Verifica conexión y servidor.',
+        );
+      });
+    } on http.ClientException catch (error) {
+      throw ApiException('Error de conexión: ${error.message}');
+    } on TimeoutException {
+      throw const ApiException(
+        'Tiempo de espera agotado al registrar venta. Verifica conexión y servidor.',
+      );
+    }
+
+    final decoded = _decodeResponse(response);
+    if (decoded is! Map<String, dynamic>) {
+      throw const ApiException('Respuesta inválida al crear venta');
+    }
+    return SaleCreateResponse.fromJson(decoded);
+  }
+
+  Future<PaginatedResponse<SaleListItem>> fetchSales({String? url}) async {
+    Uri uri;
+    if (url == null || url.trim().isEmpty) {
+      uri = Uri.http('$host:$port', '/api/sales/');
+    } else if (url.startsWith('http://') || url.startsWith('https://')) {
+      uri = Uri.parse(url);
+    } else {
+      final parsed = Uri.parse(url);
+      uri = Uri.http('$host:$port', parsed.path, parsed.queryParameters);
+    }
+    final response = await _getJson(uri);
+    if (response is! Map<String, dynamic>) {
+      throw const ApiException('Respuesta inválida al cargar ventas');
+    }
+    return PaginatedResponse<SaleListItem>.fromJson(response, SaleListItem.fromJson);
+  }
+
+  Future<SaleDetail> fetchSaleDetail(int id) async {
+    final uri = Uri.http('$host:$port', '/api/sales/$id/');
+    final response = await _getJson(uri);
+    if (response is! Map<String, dynamic>) {
+      throw const ApiException('Respuesta inválida al cargar detalle de venta');
+    }
+    return SaleDetail.fromJson(response);
+  }
+
   Future<dynamic> _getJson(Uri uri) async {
     try {
       final response = await _client.get(uri).timeout(_requestTimeout, onTimeout: () {
@@ -239,7 +403,10 @@ class CatalogApiService {
 
   dynamic _decodeResponse(http.Response response) {
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw ApiException(_extractError(response.body, response.statusCode));
+      throw ApiException(
+        _extractError(response.body, response.statusCode),
+        statusCode: response.statusCode,
+      );
     }
 
     if (response.body.trim().isEmpty) {
@@ -302,6 +469,14 @@ class CatalogApiService {
       'letter_color': {
         'BLACK': 'Negro',
         'WHITE': 'Blanco',
+      },
+      'rim_material': {
+        'ALUMINUM': 'Aluminio',
+        'IRON': 'Hierro',
+      },
+      'rim_is_set': {
+        'true': 'Juego completo',
+        'false': 'Unidad',
       },
     };
 

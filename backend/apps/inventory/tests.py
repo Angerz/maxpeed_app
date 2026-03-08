@@ -7,7 +7,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from apps.catalog.choices import ItemKind, Origin, ProductCategory, TireType
-from apps.catalog.models import Brand, CatalogItem, TireSpec
+from apps.catalog.models import Brand, CatalogItem, RimSpec, TireSpec
 from apps.inventory.models import (
     InventoryCondition,
     InventoryItem,
@@ -344,3 +344,193 @@ class InventoryItemRestockApiTests(APITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+
+
+class RimReceiptApiTests(APITestCase):
+    def setUp(self):
+        self.owner, _ = Owner.objects.get_or_create(name="Maxpeed")
+        self.brand = Brand.objects.create(name="ROMAX")
+        self.receipt_url = reverse("inventory-rim-receipts")
+        self.list_url = reverse("inventory-rims")
+        self.payload = {
+            "owner_id": self.owner.id,
+            "brand_id": self.brand.id,
+            "internal_code": "RIM-001",
+            "rim_diameter": "R15",
+            "holes": 5,
+            "width_in": 8,
+            "material": "ALUMINUM",
+            "is_set": True,
+            "quantity": 2,
+            "unit_purchase_price": "500.00",
+            "suggested_sale_price": None,
+            "notes": "Ingreso de aros",
+        }
+
+    def test_post_rim_receipt_creates_new_rim_catalog_and_inventory(self):
+        response = self.client.post(self.receipt_url, self.payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(response.data["created_new_catalog_item"])
+        self.assertEqual(CatalogItem.objects.filter(product_category=ProductCategory.RIM).count(), 1)
+        self.assertEqual(RimSpec.objects.count(), 1)
+        self.assertEqual(InventoryItem.objects.count(), 1)
+        self.assertEqual(
+            InventoryItem.objects.get().movements.filter(movement_type=MovementType.RESTOCK_IN).count(),
+            1,
+        )
+        self.assertEqual(response.data["prices_current"]["purchase"], "500.00")
+        self.assertEqual(response.data["prices_current"]["suggested_sale"], "650.00")
+
+    def test_post_rim_receipt_reuses_existing_internal_code(self):
+        first = self.client.post(self.receipt_url, self.payload, format="json")
+        second_payload = {**self.payload, "quantity": 1, "unit_purchase_price": "510.00"}
+        second = self.client.post(self.receipt_url, second_payload, format="json")
+
+        self.assertEqual(first.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(second.status_code, status.HTTP_201_CREATED)
+        self.assertFalse(second.data["created_new_catalog_item"])
+        self.assertEqual(CatalogItem.objects.filter(product_category=ProductCategory.RIM).count(), 1)
+        self.assertEqual(InventoryItem.objects.get().stock, 3)
+
+    def test_post_rim_receipt_returns_409_if_internal_code_specs_conflict(self):
+        first = self.client.post(self.receipt_url, self.payload, format="json")
+        conflict_payload = {**self.payload, "holes": 6}
+        second = self.client.post(self.receipt_url, conflict_payload, format="json")
+
+        self.assertEqual(first.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(second.status_code, status.HTTP_409_CONFLICT)
+
+    def test_get_rims_groups_by_rim_and_excludes_zero_stock(self):
+        first = self.client.post(self.receipt_url, self.payload, format="json")
+        second_payload = {
+            **self.payload,
+            "internal_code": "RIM-002",
+            "rim_diameter": "R16",
+            "quantity": 1,
+            "is_set": False,
+        }
+        second = self.client.post(self.receipt_url, second_payload, format="json")
+
+        self.assertEqual(first.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(second.status_code, status.HTTP_201_CREATED)
+
+        rim_r16_item = InventoryItem.objects.get(pk=second.data["inventory_item_id"])
+        rim_r16_item.stock = 0
+        rim_r16_item.save(update_fields=["stock"])
+
+        response = self.client.get(self.list_url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("R15", response.data)
+        self.assertNotIn("R16", response.data)
+        self.assertEqual(response.data["R15"][0]["internal_code"], "RIM-001")
+
+
+class RimDeactivateApiTests(APITestCase):
+    def setUp(self):
+        self.aldo_owner, _ = Owner.objects.get_or_create(name="ALDO")
+        self.maxpeed_owner, _ = Owner.objects.get_or_create(name="Maxpeed")
+        self.brand, _ = Brand.objects.get_or_create(name="ROMAX")
+
+        self.rim_catalog = CatalogItem.objects.create(
+            sku="RIM-ROMAX-RIM-ALDO-001",
+            code="RIM-ALDO-001",
+            item_kind=ItemKind.MERCHANDISE,
+            product_category=ProductCategory.RIM,
+            brand=self.brand,
+            model=None,
+            origin=None,
+        )
+        RimSpec.objects.create(
+            catalog_item=self.rim_catalog,
+            rim_diameter="R15",
+            holes=5,
+            width_in=8,
+            material="ALUMINUM",
+            is_set=True,
+        )
+        self.rim_inventory_aldo = InventoryItem.objects.create(
+            catalog_item=self.rim_catalog,
+            condition=InventoryCondition.NEW,
+            owner=self.aldo_owner,
+            stock=2,
+            is_active=True,
+        )
+
+        self.tire_catalog = CatalogItem.objects.create(
+            sku="TIRE-MICHELIN-195-65-R15",
+            code="195/65R15",
+            item_kind=ItemKind.MERCHANDISE,
+            product_category=ProductCategory.TIRE,
+            brand=Brand.objects.get_or_create(name="MICHELIN")[0],
+            model="PRIMACY",
+            origin=Origin.CHINA,
+        )
+        TireSpec.objects.create(
+            catalog_item=self.tire_catalog,
+            tire_type=TireType.RADIAL,
+            width=195,
+            aspect_ratio=65,
+            rim_diameter="R15",
+            ply_rating="PR8",
+            tread_type="LINEAR",
+            letter_color="BLACK",
+        )
+        self.tire_inventory = InventoryItem.objects.create(
+            catalog_item=self.tire_catalog,
+            condition=InventoryCondition.NEW,
+            owner=self.aldo_owner,
+            stock=1,
+            is_active=True,
+        )
+
+    def test_deactivate_allowed_for_aldo_rim(self):
+        url = reverse("inventory-rim-deactivate", kwargs={"inventory_item_id": self.rim_inventory_aldo.id})
+        response = self.client.post(url, {"reason": "Retiro de ALDO"}, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.rim_inventory_aldo.refresh_from_db()
+        self.assertFalse(self.rim_inventory_aldo.is_active)
+        self.assertIsNotNone(self.rim_inventory_aldo.deactivated_at)
+        self.assertEqual(response.data["owner"]["name"], "ALDO")
+
+    def test_deactivate_forbidden_for_non_aldo_owner(self):
+        rim_inventory_maxpeed = InventoryItem.objects.create(
+            catalog_item=self.rim_catalog,
+            condition=InventoryCondition.NEW,
+            owner=self.maxpeed_owner,
+            stock=1,
+            is_active=True,
+        )
+        url = reverse("inventory-rim-deactivate", kwargs={"inventory_item_id": rim_inventory_maxpeed.id})
+        response = self.client.post(url, {"reason": "Retiro"}, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_deactivate_returns_404_when_not_found(self):
+        url = reverse("inventory-rim-deactivate", kwargs={"inventory_item_id": 999999})
+        response = self.client.post(url, {"reason": "Retiro"}, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_deactivate_returns_400_for_non_rim_item(self):
+        url = reverse("inventory-rim-deactivate", kwargs={"inventory_item_id": self.tire_inventory.id})
+        response = self.client.post(url, {"reason": "Retiro"}, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_deactivated_rim_is_hidden_from_rim_list(self):
+        deactivate_url = reverse("inventory-rim-deactivate", kwargs={"inventory_item_id": self.rim_inventory_aldo.id})
+        list_url = reverse("inventory-rims")
+
+        before = self.client.get(list_url)
+        self.assertEqual(before.status_code, status.HTTP_200_OK)
+        self.assertIn("R15", before.data)
+
+        deactivate_response = self.client.post(deactivate_url, {"reason": "Retiro de ALDO"}, format="json")
+        self.assertEqual(deactivate_response.status_code, status.HTTP_200_OK)
+
+        after = self.client.get(list_url)
+        self.assertEqual(after.status_code, status.HTTP_200_OK)
+        self.assertNotIn("R15", after.data)

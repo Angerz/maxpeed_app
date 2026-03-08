@@ -86,3 +86,25 @@ class LetterColor(models.TextChoices):
     WHITE = "WHITE", "White"
     # RED = "RED", "Red"
     # YELLOW = "YELLOW", "Yellow"
+
+
+class RimHoles(models.IntegerChoices):
+    H4 = 4, "4H"
+    H5 = 5, "5H"
+    H6 = 6, "6H"
+
+
+class RimWidthIn(models.IntegerChoices):
+    W5 = 5, "5IN"
+    W6 = 6, "6IN"
+    W7 = 7, "7IN"
+    W8 = 8, "8IN"
+    W9 = 9, "9IN"
+    W10 = 10, "10IN"
+    W11 = 11, "11IN"
+    W12 = 12, "12IN"
+
+
+class RimMaterial(models.TextChoices):
+    ALUMINUM = "ALUMINUM", "Aluminum"
+    IRON = "IRON", "Iron"

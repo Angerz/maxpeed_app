@@ -10,6 +10,9 @@ from .choices import (
     PlyRating,
     ProductCategory,
     RimDiameter,
+    RimHoles,
+    RimMaterial,
+    RimWidthIn,
     TireType,
     TreadType,
 )
@@ -108,14 +111,17 @@ class CatalogItem(models.Model):
         if is_service and self.origin:
             raise ValidationError({"origin": "Service items should not define origin."})
 
-        if is_merchandise and not self.origin:
-            raise ValidationError({"origin": "Merchandise items require origin."})
+        if self.product_category == ProductCategory.TIRE and not self.origin:
+            raise ValidationError({"origin": "Tire catalog items require origin."})
 
         if self.product_category in {ProductCategory.TIRE, ProductCategory.RIM} and not self.brand:
             raise ValidationError({"brand": "Brand is required for tire and rim catalog items."})
 
         if self.product_category == ProductCategory.TIRE and not self.code:
             raise ValidationError({"code": "Tire catalog items require a size code."})
+
+        if self.product_category == ProductCategory.RIM and not self.code:
+            raise ValidationError({"code": "Rim catalog items require an internal code."})
 
         if is_service and self.code:
             raise ValidationError({"code": "Service items should not define a tire size code."})
@@ -198,6 +204,36 @@ class TireSpec(models.Model):
         return super().save(*args, **kwargs)
 
 
+class RimSpec(models.Model):
+    catalog_item = models.OneToOneField(
+        CatalogItem,
+        on_delete=models.CASCADE,
+        related_name="rim_spec",
+    )
+    rim_diameter = models.CharField(max_length=3, choices=RimDiameter.choices)
+    holes = models.PositiveSmallIntegerField(choices=RimHoles.choices)
+    width_in = models.PositiveSmallIntegerField(choices=RimWidthIn.choices)
+    material = models.CharField(max_length=16, choices=RimMaterial.choices)
+    is_set = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["catalog_item__sku"]
+
+    def clean(self):
+        super().clean()
+        if self.catalog_item.product_category != ProductCategory.RIM:
+            raise ValidationError({"catalog_item": "RimSpec can only be attached to RIM catalog items."})
+
+    def __str__(self) -> str:
+        kind = "SET" if self.is_set else "SINGLE"
+        return f"{self.rim_diameter} {self.holes}H {self.width_in}IN {kind}"
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+
 def build_tire_sku(*, brand_name, width, rim_diameter, model=None, aspect_ratio=None):
     parts = [
         "TIRE",
@@ -210,3 +246,13 @@ def build_tire_sku(*, brand_name, width, rim_diameter, model=None, aspect_ratio=
     if model:
         parts.append(slugify(model).upper())
     return "-".join(part for part in parts if part)[:64]
+
+
+def build_rim_sku(*, brand_name, internal_code):
+    return "-".join(
+        [
+            "RIM",
+            slugify(brand_name).upper() or "BRAND",
+            slugify(internal_code).upper() or "CODE",
+        ]
+    )[:64]

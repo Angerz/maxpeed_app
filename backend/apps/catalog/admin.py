@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Brand, CatalogItem, TireSpec
+from .models import Brand, CatalogItem, RimSpec, TireSpec
 
 admin.site.site_header = "Maxpeed Control"
 admin.site.site_title = "Maxpeed Admin"
@@ -19,6 +19,11 @@ class TireSpecInline(admin.StackedInline):
     extra = 0
 
 
+class RimSpecInline(admin.StackedInline):
+    model = RimSpec
+    extra = 0
+
+
 @admin.register(CatalogItem)
 class CatalogItemAdmin(admin.ModelAdmin):
     list_display = (
@@ -33,7 +38,7 @@ class CatalogItemAdmin(admin.ModelAdmin):
     )
     list_filter = ("item_kind", "product_category", "origin", "is_active")
     search_fields = ("sku", "code", "model", "brand__name")
-    inlines = (TireSpecInline,)
+    inlines = (TireSpecInline, RimSpecInline)
 
 
 @admin.register(TireSpec)
@@ -49,3 +54,9 @@ class TireSpecAdmin(admin.ModelAdmin):
         "letter_color",
     )
     list_filter = ("tire_type", "rim_diameter", "ply_rating", "tread_type", "letter_color")
+
+
+@admin.register(RimSpec)
+class RimSpecAdmin(admin.ModelAdmin):
+    list_display = ("catalog_item", "rim_diameter", "holes", "width_in", "material", "is_set")
+    list_filter = ("rim_diameter", "holes", "width_in", "material", "is_set")

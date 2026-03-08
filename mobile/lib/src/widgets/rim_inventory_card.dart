@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 
-import '../models/inventory_card_item.dart';
+import '../models/rim_inventory_card_item.dart';
 
-class TireInventoryCard extends StatelessWidget {
-  const TireInventoryCard({
+class RimInventoryCard extends StatelessWidget {
+  const RimInventoryCard({
     super.key,
     required this.item,
     this.onTap,
     this.onAdd,
   });
 
-  final InventoryCardItem item;
+  final RimInventoryCardItem item;
   final VoidCallback? onTap;
   final VoidCallback? onAdd;
 
@@ -44,9 +44,7 @@ class TireInventoryCard extends StatelessWidget {
                         _logoAsset,
                         fit: BoxFit.contain,
                         alignment: Alignment.centerRight,
-                        errorBuilder: (_, __, ___) {
-                          return _BrandPlaceholder(brand: item.brand);
-                        },
+                        errorBuilder: (_, __, ___) => _BrandPlaceholder(brand: item.brand),
                       ),
                     ),
                   ),
@@ -58,17 +56,13 @@ class TireInventoryCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      item.code,
-                      style: theme.textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
+                      item.internalCode,
+                      style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
                     ),
                     const SizedBox(height: 6),
                     Text(
                       item.brand,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
+                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
                     ),
                     const SizedBox(height: 8),
                     Text(
@@ -117,7 +111,7 @@ class _BrandPlaceholder extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
-            Icons.directions_car_filled_rounded,
+            Icons.album_outlined,
             size: 56,
             color: theme.colorScheme.primary,
           ),
@@ -125,9 +119,7 @@ class _BrandPlaceholder extends StatelessWidget {
           Text(
             brand,
             textAlign: TextAlign.center,
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
+            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
           ),
         ],
       ),

@@ -7,6 +7,9 @@ from apps.catalog.choices import (
     Origin,
     PlyRating,
     RimDiameter,
+    RimHoles,
+    RimMaterial,
+    RimWidthIn,
     TireType,
     TreadType,
 )
@@ -154,3 +157,83 @@ class RestockResponseSerializer(serializers.Serializer):
     receipt_line_id = serializers.IntegerField()
     movement_id = serializers.IntegerField()
     last_restock_at = serializers.DateTimeField(allow_null=True)
+
+
+class RimReceiptCreateSerializer(serializers.Serializer):
+    owner_id = serializers.PrimaryKeyRelatedField(
+        source="owner",
+        queryset=Owner.objects.filter(is_active=True),
+        required=False,
+        allow_null=True,
+    )
+    brand_id = serializers.PrimaryKeyRelatedField(
+        source="brand",
+        queryset=Brand.objects.all(),
+    )
+    internal_code = serializers.CharField(max_length=64)
+    rim_diameter = serializers.ChoiceField(choices=RimDiameter.choices)
+    holes = serializers.ChoiceField(choices=RimHoles.choices)
+    width_in = serializers.ChoiceField(choices=RimWidthIn.choices)
+    material = serializers.ChoiceField(choices=RimMaterial.choices)
+    is_set = serializers.BooleanField()
+    quantity = serializers.IntegerField(min_value=1)
+    unit_purchase_price = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=Decimal("0.01"))
+    suggested_sale_price = serializers.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        min_value=Decimal("0.01"),
+        required=False,
+        allow_null=True,
+    )
+    notes = serializers.CharField(required=False, allow_blank=True, allow_null=True, max_length=1000)
+
+    def validate_internal_code(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError("internal_code is required.")
+        return value
+
+    def validate(self, attrs):
+        if attrs.get("suggested_sale_price") is None:
+            attrs["suggested_sale_price"] = (
+                attrs["unit_purchase_price"] * Decimal("1.30")
+            ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+        if attrs.get("owner") is None:
+            attrs["owner"] = Owner.objects.filter(name__iexact="Maxpeed").first() or Owner.objects.order_by("id").first()
+            if attrs["owner"] is None:
+                raise serializers.ValidationError({"owner_id": "No owners configured in the system."})
+        return attrs
+
+
+class RimReceiptCreateResponseSerializer(serializers.Serializer):
+    inventory_item_id = serializers.IntegerField()
+    catalog_item_id = serializers.IntegerField()
+    created_new_catalog_item = serializers.BooleanField()
+    stock_after = serializers.IntegerField()
+    prices_current = CurrentPricesSerializer()
+    receipt_id = serializers.IntegerField()
+    receipt_line_id = serializers.IntegerField()
+    movement_id = serializers.IntegerField()
+
+
+class RimInventoryCardSerializer(serializers.Serializer):
+    inventory_item_id = serializers.IntegerField()
+    internal_code = serializers.CharField()
+    brand = serializers.CharField(allow_null=True)
+    stock = serializers.IntegerField()
+    details = serializers.CharField()
+    owner = InventoryOwnerSerializer()
+
+
+class RimDeactivateSerializer(serializers.Serializer):
+    reason = serializers.CharField(required=False, allow_blank=True, allow_null=True, max_length=255)
+    notes = serializers.CharField(required=False, allow_blank=True, allow_null=True, max_length=1000)
+
+
+class RimDeactivateResponseSerializer(serializers.Serializer):
+    inventory_item_id = serializers.IntegerField()
+    is_active = serializers.BooleanField()
+    deactivated_at = serializers.DateTimeField(allow_null=True)
+    owner = InventoryOwnerSerializer()
+    message = serializers.CharField()

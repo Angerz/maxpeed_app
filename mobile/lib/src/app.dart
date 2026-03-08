@@ -37,13 +37,90 @@ class MaxpeedApp extends StatelessWidget {
         ),
         cardTheme: const CardThemeData(
           color: brandDarkSoft,
+          margin: EdgeInsets.zero,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.all(Radius.circular(16)),
+          ),
         ),
-        inputDecorationTheme: const InputDecorationTheme(
-          border: OutlineInputBorder(),
+        inputDecorationTheme: InputDecorationTheme(
           filled: true,
-          fillColor: brandDarkSoft,
-          labelStyle: TextStyle(color: brandLight),
-          hintStyle: TextStyle(color: Color(0xFF969693)),
+          fillColor: brandDarkSoft.withValues(alpha: 0.82),
+          labelStyle: const TextStyle(color: brandLight),
+          hintStyle: const TextStyle(color: Color(0xFF969693)),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 14,
+            vertical: 14,
+          ),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: Color(0x44969693)),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: Color(0x44969693)),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: brandYellow, width: 1.4),
+          ),
+          errorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: brandOrange),
+          ),
+          focusedErrorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: brandOrange, width: 1.4),
+          ),
+        ),
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: brandOrange,
+            foregroundColor: brandDark,
+            disabledBackgroundColor: brandBrown,
+            disabledForegroundColor: brandLight,
+            elevation: 0,
+            minimumSize: const Size(0, 46),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            textStyle: const TextStyle(fontWeight: FontWeight.w700),
+          ),
+        ),
+        filledButtonTheme: FilledButtonThemeData(
+          style: FilledButton.styleFrom(
+            backgroundColor: brandYellow,
+            foregroundColor: brandDark,
+            disabledBackgroundColor: brandBrown,
+            disabledForegroundColor: brandLight,
+            minimumSize: const Size(0, 46),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            textStyle: const TextStyle(fontWeight: FontWeight.w700),
+          ),
+        ),
+        outlinedButtonTheme: OutlinedButtonThemeData(
+          style: OutlinedButton.styleFrom(
+            foregroundColor: brandOrange,
+            side: const BorderSide(color: brandOrange),
+            minimumSize: const Size(0, 46),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            textStyle: const TextStyle(fontWeight: FontWeight.w700),
+          ),
+        ),
+        textButtonTheme: TextButtonThemeData(
+          style: TextButton.styleFrom(
+            foregroundColor: brandOrange,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
         ),
         navigationBarTheme: NavigationBarThemeData(
           backgroundColor: brandDarkSoft,
@@ -63,27 +140,6 @@ class MaxpeedApp extends StatelessWidget {
             }
             return const IconThemeData(color: brandLight);
           }),
-        ),
-        filledButtonTheme: FilledButtonThemeData(
-          style: FilledButton.styleFrom(
-            backgroundColor: brandYellow,
-            foregroundColor: brandDark,
-            disabledBackgroundColor: brandBrown,
-            disabledForegroundColor: brandLight,
-            textStyle: const TextStyle(fontWeight: FontWeight.w700),
-          ),
-        ),
-        outlinedButtonTheme: OutlinedButtonThemeData(
-          style: OutlinedButton.styleFrom(
-            foregroundColor: brandOrange,
-            side: const BorderSide(color: brandOrange),
-            textStyle: const TextStyle(fontWeight: FontWeight.w700),
-          ),
-        ),
-        textButtonTheme: TextButtonThemeData(
-          style: TextButton.styleFrom(
-            foregroundColor: brandOrange,
-          ),
         ),
         snackBarTheme: const SnackBarThemeData(
           backgroundColor: brandOrange,

@@ -10,6 +10,10 @@ class CatalogChoices {
     required this.treadTypes,
     required this.letterColors,
     required this.owners,
+    required this.rimHoles,
+    required this.rimWidthsIn,
+    required this.rimMaterials,
+    required this.rimIsSet,
   });
 
   final List<CatalogChoiceOption> tireTypes;
@@ -19,6 +23,10 @@ class CatalogChoices {
   final List<CatalogChoiceOption> treadTypes;
   final List<CatalogChoiceOption> letterColors;
   final List<Owner> owners;
+  final List<CatalogChoiceOption> rimHoles;
+  final List<CatalogChoiceOption> rimWidthsIn;
+  final List<CatalogChoiceOption> rimMaterials;
+  final List<CatalogChoiceOption> rimIsSet;
 
   factory CatalogChoices.fromJson(Map<String, dynamic> json) {
     List<CatalogChoiceOption> parseList(String key) {
@@ -45,6 +53,10 @@ class CatalogChoices {
               .map((item) => Owner.fromJson(item.cast<String, dynamic>()))
               .toList()
           : const [],
+      rimHoles: parseList('rim_holes'),
+      rimWidthsIn: parseList('rim_width_in'),
+      rimMaterials: parseList('rim_material'),
+      rimIsSet: parseList('rim_is_set'),
     );
   }
 }

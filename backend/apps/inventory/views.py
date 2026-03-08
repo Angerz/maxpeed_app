@@ -5,11 +5,24 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .services import get_inventory_cards_grouped_by_rim, get_inventory_item_detail_payload
+from .services.rims import (
+    RimDeactivateForbiddenError,
+    RimDeactivateValidationError,
+    RimSpecConflictError,
+    create_rim_stock_receipt,
+    deactivate_rim_inventory_item,
+    get_rim_inventory_cards_grouped,
+)
 from .services.restock import RestockConflictError, restock_inventory_item
 from .models import InventoryItem
 from .serializers import (
     InventoryCardSerializer,
     InventoryDetailSerializer,
+    RimInventoryCardSerializer,
+    RimDeactivateResponseSerializer,
+    RimDeactivateSerializer,
+    RimReceiptCreateResponseSerializer,
+    RimReceiptCreateSerializer,
     RestockResponseSerializer,
     RestockSerializer,
     StockReceiptCreateResponseSerializer,
@@ -92,3 +105,62 @@ class InventoryItemRestockAPIView(APIView):
 
         response_serializer = RestockResponseSerializer(payload)
         return Response(response_serializer.data, status=status.HTTP_201_CREATED)
+
+
+class RimReceiptCreateAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request, *args, **kwargs):
+        serializer = RimReceiptCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        user = request.user if getattr(request.user, "is_authenticated", False) else None
+        try:
+            payload = create_rim_stock_receipt(
+                payload=serializer.validated_data,
+                user=user,
+            )
+        except RimSpecConflictError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
+
+        response_serializer = RimReceiptCreateResponseSerializer(payload)
+        return Response(response_serializer.data, status=status.HTTP_201_CREATED)
+
+
+class RimInventoryListAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request, *args, **kwargs):
+        grouped = get_rim_inventory_cards_grouped()
+        response_data = {
+            rim: RimInventoryCardSerializer(cards, many=True).data
+            for rim, cards in grouped.items()
+        }
+        return Response(response_data)
+
+
+class RimInventoryDeactivateAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request, inventory_item_id, *args, **kwargs):
+        serializer = RimDeactivateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        user = request.user if getattr(request.user, "is_authenticated", False) else None
+        try:
+            payload = deactivate_rim_inventory_item(
+                inventory_item_id=inventory_item_id,
+                reason=serializer.validated_data.get("reason"),
+                notes=serializer.validated_data.get("notes"),
+                user=user,
+            )
+        except RimDeactivateForbiddenError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
+        except RimDeactivateValidationError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        if payload is None:
+            return Response({"detail": "Inventory item not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        response_serializer = RimDeactivateResponseSerializer(payload)
+        return Response(response_serializer.data, status=status.HTTP_200_OK)

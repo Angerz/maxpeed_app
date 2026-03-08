@@ -5,6 +5,9 @@ from .choices import (
     Origin,
     PlyRating,
     RimDiameter,
+    RimHoles,
+    RimMaterial,
+    RimWidthIn,
     TireType,
     TreadType,
 )
@@ -73,6 +76,25 @@ SPANISH_CHOICE_LABELS = {
         "BLACK": "Negro",
         "WHITE": "Blanco",
     },
+    "rim_holes": {
+        4: "4 huecos",
+        5: "5 huecos",
+        6: "6 huecos",
+    },
+    "rim_width_in": {
+        5: "5 pulgadas",
+        6: "6 pulgadas",
+        7: "7 pulgadas",
+        8: "8 pulgadas",
+        9: "9 pulgadas",
+        10: "10 pulgadas",
+        11: "11 pulgadas",
+        12: "12 pulgadas",
+    },
+    "rim_material": {
+        "ALUMINUM": "Aluminio",
+        "IRON": "Fierro",
+    },
 }
 
 
@@ -90,6 +112,10 @@ class CatalogChoicesSerializer(serializers.Serializer):
     ply_rating = serializers.ListField()
     tread_type = serializers.ListField()
     letter_color = serializers.ListField()
+    rim_holes = serializers.ListField()
+    rim_width_in = serializers.ListField()
+    rim_material = serializers.ListField()
+    rim_is_set = serializers.ListField()
     owners = serializers.ListField()
 
     @classmethod
@@ -101,6 +127,13 @@ class CatalogChoicesSerializer(serializers.Serializer):
             "ply_rating": serialize_choices(PlyRating, SPANISH_CHOICE_LABELS["ply_rating"]),
             "tread_type": serialize_choices(TreadType, SPANISH_CHOICE_LABELS["tread_type"]),
             "letter_color": serialize_choices(LetterColor, SPANISH_CHOICE_LABELS["letter_color"]),
+            "rim_holes": serialize_choices(RimHoles, SPANISH_CHOICE_LABELS["rim_holes"]),
+            "rim_width_in": serialize_choices(RimWidthIn, SPANISH_CHOICE_LABELS["rim_width_in"]),
+            "rim_material": serialize_choices(RimMaterial, SPANISH_CHOICE_LABELS["rim_material"]),
+            "rim_is_set": [
+                {"value": True, "label": "Juego"},
+                {"value": False, "label": "Suelto"},
+            ],
             "owners": owners,
         }
 
@@ -109,3 +142,8 @@ class BrandSerializer(serializers.ModelSerializer):
     class Meta:
         model = Brand
         fields = ("id", "name")
+
+
+class CatalogServiceSerializer(serializers.Serializer):
+    value = serializers.CharField()
+    label = serializers.CharField()

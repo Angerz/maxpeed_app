@@ -2,12 +2,23 @@ import 'package:flutter/material.dart';
 
 import '../models/inventory_card_item.dart';
 import '../models/inventory_group_response.dart';
+import '../models/cart_models.dart';
+import '../models/rim_grouped_response.dart';
+import '../models/rim_inventory_card_item.dart';
+import '../panels/add_to_cart_sheet.dart';
 import '../panels/inventory_detail_sheet.dart';
+import '../panels/rim_detail_sheet.dart';
 import '../services/catalog_api_service.dart';
+import '../store/cart_store.dart';
+import '../widgets/rim_inventory_card.dart';
 import '../widgets/tire_inventory_card.dart';
 
+enum InventoryViewMode { tires, rims }
+
 class InventoryScreen extends StatefulWidget {
-  const InventoryScreen({super.key});
+  const InventoryScreen({super.key, required this.cartStore});
+
+  final CartStore cartStore;
 
   @override
   State<InventoryScreen> createState() => _InventoryScreenState();
@@ -17,15 +28,20 @@ class _InventoryScreenState extends State<InventoryScreen> {
   final _searchController = TextEditingController();
   final _apiService = CatalogApiService();
 
+  InventoryViewMode _mode = InventoryViewMode.tires;
   bool _includeZeroStock = false;
-  bool _isLoading = true;
-  String? _error;
-  InventoryGroupResponse? _inventory;
+
+  bool _isLoadingTires = false;
+  bool _isLoadingRims = false;
+  String? _tiresError;
+  String? _rimsError;
+  InventoryGroupResponse? _tiresInventory;
+  RimGroupedResponse? _rimsInventory;
 
   @override
   void initState() {
     super.initState();
-    _fetchInventory();
+    _fetchTires();
   }
 
   @override
@@ -34,10 +50,10 @@ class _InventoryScreenState extends State<InventoryScreen> {
     super.dispose();
   }
 
-  Future<void> _fetchInventory() async {
+  Future<void> _fetchTires() async {
     setState(() {
-      _isLoading = true;
-      _error = null;
+      _isLoadingTires = true;
+      _tiresError = null;
     });
 
     try {
@@ -46,19 +62,49 @@ class _InventoryScreenState extends State<InventoryScreen> {
         return;
       }
       setState(() {
-        _inventory = response;
+        _tiresInventory = response;
       });
     } catch (error) {
       if (!mounted) {
         return;
       }
       setState(() {
-        _error = error.toString();
+        _tiresError = error.toString();
       });
     } finally {
       if (mounted) {
         setState(() {
-          _isLoading = false;
+          _isLoadingTires = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _fetchRims() async {
+    setState(() {
+      _isLoadingRims = true;
+      _rimsError = null;
+    });
+
+    try {
+      final response = await _apiService.fetchRimsInventory();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _rimsInventory = response;
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _rimsError = error.toString();
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingRims = false;
         });
       }
     }
@@ -69,21 +115,21 @@ class _InventoryScreenState extends State<InventoryScreen> {
     return int.tryParse(match?.group(1) ?? '') ?? 9999;
   }
 
-  List<String> _sortedGroupKeys(Map<String, List<InventoryCardItem>> groups) {
-    final keys = groups.keys.toList();
-    keys.sort((a, b) {
+  List<String> _sortGroupKeys(Iterable<String> keys) {
+    final sorted = keys.toList();
+    sorted.sort((a, b) {
       final byRim = _rimNumber(a).compareTo(_rimNumber(b));
       if (byRim != 0) {
         return byRim;
       }
       return a.compareTo(b);
     });
-    return keys;
+    return sorted;
   }
 
-  List<InventoryCardItem> _sortedItems(List<InventoryCardItem> items) {
-    final sorted = List<InventoryCardItem>.from(items);
-    sorted.sort((a, b) => a.code.compareTo(b.code));
+  List<InventoryCardItem> _filterAndSortTireItems(List<InventoryCardItem> items) {
+    final sorted = List<InventoryCardItem>.from(items)
+      ..sort((a, b) => a.code.compareTo(b.code));
 
     final query = _searchController.text.trim().toLowerCase();
     if (query.isEmpty) {
@@ -93,7 +139,19 @@ class _InventoryScreenState extends State<InventoryScreen> {
     return sorted.where((item) => item.code.toLowerCase().contains(query)).toList();
   }
 
-  void _openDetail(InventoryCardItem item) {
+  List<RimInventoryCardItem> _filterAndSortRimItems(List<RimInventoryCardItem> items) {
+    final sorted = List<RimInventoryCardItem>.from(items)
+      ..sort((a, b) => a.internalCode.compareTo(b.internalCode));
+
+    final query = _searchController.text.trim().toLowerCase();
+    if (query.isEmpty) {
+      return sorted;
+    }
+
+    return sorted.where((item) => item.internalCode.toLowerCase().contains(query)).toList();
+  }
+
+  void _openTireDetail(InventoryCardItem item) {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -105,40 +163,125 @@ class _InventoryScreenState extends State<InventoryScreen> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+  Future<void> _openRimPreview(RimInventoryCardItem item) async {
+    final deactivated = await showModalBottomSheet<bool>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (_) => RimDetailSheet(
+        item: item,
+        apiService: _apiService,
+      ),
+    );
+
+    if (deactivated == true && mounted) {
+      await _fetchRims();
+    }
+  }
+
+  Future<void> _addTireToCart(InventoryCardItem item) async {
+    final result = await showModalBottomSheet<AddToCartResult>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) => AddToCartSheet(
+        title: 'Agregar llanta ${item.code}',
+        stock: item.stock,
+      ),
+    );
+
+    if (!mounted || result == null) {
+      return;
     }
 
-    if (_error != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'No se pudo cargar inventario.\n$_error',
-                textAlign: TextAlign.center,
+    widget.cartStore.addProduct(
+      inventoryItemId: item.inventoryItemId,
+      itemType: CartProductType.tire,
+      displayCode: item.code,
+      brand: item.brand,
+      ownerName: item.owner?.name ?? '-',
+      quantity: result.quantity,
+      unitPrice: result.unitPrice,
+      availableStock: item.stock,
+    );
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Producto agregado al carrito')),
+    );
+  }
+
+  Future<void> _addRimToCart(RimInventoryCardItem item) async {
+    final result = await showModalBottomSheet<AddToCartResult>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) => AddToCartSheet(
+        title: 'Agregar aro ${item.internalCode}',
+        stock: item.stock,
+      ),
+    );
+
+    if (!mounted || result == null) {
+      return;
+    }
+
+    widget.cartStore.addProduct(
+      inventoryItemId: item.inventoryItemId,
+      itemType: CartProductType.rim,
+      displayCode: item.internalCode,
+      brand: item.brand,
+      ownerName: item.owner?.name ?? '-',
+      quantity: result.quantity,
+      unitPrice: result.unitPrice,
+      availableStock: item.stock,
+    );
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Producto agregado al carrito')),
+    );
+  }
+
+  Widget _buildHeaderControls() {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+          child: SegmentedButton<InventoryViewMode>(
+            segments: const [
+              ButtonSegment(
+                value: InventoryViewMode.tires,
+                label: Text('Llantas'),
               ),
-              const SizedBox(height: 16),
-              FilledButton(
-                onPressed: _fetchInventory,
-                child: const Text('Reintentar'),
+              ButtonSegment(
+                value: InventoryViewMode.rims,
+                label: Text('Aros'),
               ),
             ],
+            selected: {_mode},
+            onSelectionChanged: (value) {
+              final next = value.first;
+              if (next == _mode) {
+                return;
+              }
+              setState(() {
+                _mode = next;
+              });
+
+              if (_mode == InventoryViewMode.rims &&
+                  _rimsInventory == null &&
+                  !_isLoadingRims) {
+                _fetchRims();
+              }
+
+              if (_mode == InventoryViewMode.tires &&
+                  _tiresInventory == null &&
+                  !_isLoadingTires) {
+                _fetchTires();
+              }
+            },
           ),
         ),
-      );
-    }
-
-    final groups = _inventory?.groups ?? const <String, List<InventoryCardItem>>{};
-    final keys = _sortedGroupKeys(groups);
-
-    if (keys.isEmpty) {
-      return Column(
-        children: [
+        if (_mode == InventoryViewMode.tires)
           SwitchListTile(
             title: const Text('Incluir sin stock'),
             value: _includeZeroStock,
@@ -146,36 +289,18 @@ class _InventoryScreenState extends State<InventoryScreen> {
               setState(() {
                 _includeZeroStock = value;
               });
-              _fetchInventory();
+              _fetchTires();
             },
           ),
-          const Expanded(
-            child: Center(child: Text('No hay items en inventario.')),
-          ),
-        ],
-      );
-    }
-
-    return Column(
-      children: [
-        SwitchListTile(
-          title: const Text('Incluir sin stock'),
-          value: _includeZeroStock,
-          onChanged: (value) {
-            setState(() {
-              _includeZeroStock = value;
-            });
-            _fetchInventory();
-          },
-        ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
           child: TextField(
             controller: _searchController,
             onChanged: (_) => setState(() {}),
             decoration: InputDecoration(
-              labelText: 'Buscar por código',
-              hintText: 'Ej: 265, 33x12.5R18',
+              labelText: _mode == InventoryViewMode.tires
+                  ? 'Buscar por código de llanta'
+                  : 'Buscar por código interno de aro',
               prefixIcon: const Icon(Icons.search),
               suffixIcon: _searchController.text.isEmpty
                   ? null
@@ -189,35 +314,122 @@ class _InventoryScreenState extends State<InventoryScreen> {
             ),
           ),
         ),
+      ],
+    );
+  }
+
+  Widget _buildError(String message, VoidCallback onRetry) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(message, textAlign: TextAlign.center),
+            const SizedBox(height: 16),
+            FilledButton(onPressed: onRetry, child: const Text('Reintentar')),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTiresList() {
+    if (_isLoadingTires) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_tiresError != null) {
+      return _buildError('No se pudo cargar inventario de llantas.\n$_tiresError', _fetchTires);
+    }
+
+    final groups = _tiresInventory?.groups ?? const <String, List<InventoryCardItem>>{};
+    final groupKeys = _sortGroupKeys(groups.keys);
+
+    if (groupKeys.isEmpty) {
+      return const Center(child: Text('No hay llantas en inventario.'));
+    }
+
+    return ListView(
+      padding: const EdgeInsets.only(top: 6, bottom: 16),
+      children: groupKeys.expand((key) {
+        final items = _filterAndSortTireItems(groups[key] ?? const []);
+        if (items.isEmpty) {
+          return <Widget>[];
+        }
+
+        return <Widget>[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 2),
+            child: Text(
+              key,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+            ),
+          ),
+          ...items.map(
+            (item) => TireInventoryCard(
+              item: item,
+              onTap: () => _openTireDetail(item),
+              onAdd: () => _addTireToCart(item),
+            ),
+          ),
+        ];
+      }).toList(),
+    );
+  }
+
+  Widget _buildRimsList() {
+    if (_isLoadingRims) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_rimsError != null) {
+      return _buildError('No se pudo cargar inventario de aros.\n$_rimsError', _fetchRims);
+    }
+
+    final groups = _rimsInventory?.groups ?? const <String, List<RimInventoryCardItem>>{};
+    final groupKeys = _sortGroupKeys(groups.keys);
+
+    if (groupKeys.isEmpty) {
+      return const Center(child: Text('No hay aros en inventario.'));
+    }
+
+    return ListView(
+      padding: const EdgeInsets.only(top: 6, bottom: 16),
+      children: groupKeys.expand((key) {
+        final items = _filterAndSortRimItems(groups[key] ?? const []);
+        if (items.isEmpty) {
+          return <Widget>[];
+        }
+
+        return <Widget>[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 2),
+            child: Text(
+              key,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+            ),
+          ),
+          ...items.map(
+            (item) => RimInventoryCard(
+              item: item,
+              onTap: () => _openRimPreview(item),
+              onAdd: () => _addRimToCart(item),
+            ),
+          ),
+        ];
+      }).toList(),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        _buildHeaderControls(),
         const SizedBox(height: 6),
         Expanded(
-          child: ListView(
-            padding: const EdgeInsets.only(top: 6, bottom: 16),
-            children: keys.expand((key) {
-              final items = _sortedItems(groups[key] ?? const []);
-              if (items.isEmpty) {
-                return <Widget>[];
-              }
-
-              return <Widget>[
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 2),
-                  child: Text(
-                    key,
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w800,
-                        ),
-                  ),
-                ),
-                ...items.map(
-                  (item) => TireInventoryCard(
-                    item: item,
-                    onTap: () => _openDetail(item),
-                  ),
-                ),
-              ];
-            }).toList(),
-          ),
+          child: _mode == InventoryViewMode.tires ? _buildTiresList() : _buildRimsList(),
         ),
       ],
     );

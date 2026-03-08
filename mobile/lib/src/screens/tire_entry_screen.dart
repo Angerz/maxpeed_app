@@ -5,8 +5,11 @@ import '../models/brand_option.dart';
 import '../models/catalog_choice_option.dart';
 import '../models/catalog_choices.dart';
 import '../models/owner.dart';
+import '../models/rim_receipt_request.dart';
 import '../services/catalog_api_service.dart';
 import '../widgets/brand_autocomplete_field.dart';
+
+enum EntryMode { tire, rim }
 
 class TireEntryScreen extends StatefulWidget {
   const TireEntryScreen({super.key});
@@ -16,48 +19,17 @@ class TireEntryScreen extends StatefulWidget {
 }
 
 class _TireEntryScreenState extends State<TireEntryScreen> {
-  final _formKey = GlobalKey<FormState>();
-  final _brandController = TextEditingController();
-  final _widthController = TextEditingController();
-  final _profileController = TextEditingController();
-  final _quantityController = TextEditingController();
-  final _priceController = TextEditingController();
-  final _suggestedPriceController = TextEditingController();
-  final _modelController = TextEditingController();
-
   late final CatalogApiService _apiService;
-
   CatalogChoices? _choices;
-  BrandOption? _selectedBrand;
-  Owner? _selectedOwner;
-  CatalogChoiceOption? _selectedTireType;
-  CatalogChoiceOption? _selectedRimDiameter;
-  CatalogChoiceOption? _selectedOrigin;
-  CatalogChoiceOption? _selectedPlyRating;
-  CatalogChoiceOption? _selectedTreadType;
-  CatalogChoiceOption? _selectedLetterColor;
-
   bool _isLoading = true;
-  bool _isSubmitting = false;
   String? _loadError;
+  EntryMode _mode = EntryMode.tire;
 
   @override
   void initState() {
     super.initState();
     _apiService = CatalogApiService();
     _loadInitialData();
-  }
-
-  @override
-  void dispose() {
-    _brandController.dispose();
-    _widthController.dispose();
-    _profileController.dispose();
-    _quantityController.dispose();
-    _priceController.dispose();
-    _suggestedPriceController.dispose();
-    _modelController.dispose();
-    super.dispose();
   }
 
   Future<void> _loadInitialData() async {
@@ -73,9 +45,6 @@ class _TireEntryScreenState extends State<TireEntryScreen> {
       }
       setState(() {
         _choices = choices;
-        _selectedOwner = choices.owners.isNotEmpty
-            ? choices.owners.first
-            : null;
       });
     } catch (error) {
       if (!mounted) {
@@ -91,6 +60,116 @@ class _TireEntryScreenState extends State<TireEntryScreen> {
         });
       }
     }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_loadError != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(_loadError!, textAlign: TextAlign.center),
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed: _loadInitialData,
+                child: const Text('Reintentar'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final choices = _choices;
+    if (choices == null) {
+      return const SizedBox.shrink();
+    }
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
+          child: SegmentedButton<EntryMode>(
+            segments: const [
+              ButtonSegment(value: EntryMode.tire, label: Text('LLANTA')),
+              ButtonSegment(value: EntryMode.rim, label: Text('ARO')),
+            ],
+            selected: {_mode},
+            onSelectionChanged: (next) {
+              setState(() {
+                _mode = next.first;
+              });
+            },
+          ),
+        ),
+        Expanded(
+          child: IndexedStack(
+            index: _mode == EntryMode.tire ? 0 : 1,
+            children: [
+              _TireEntryForm(choices: choices, apiService: _apiService),
+              _RimEntryForm(choices: choices, apiService: _apiService),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _TireEntryForm extends StatefulWidget {
+  const _TireEntryForm({required this.choices, required this.apiService});
+
+  final CatalogChoices choices;
+  final CatalogApiService apiService;
+
+  @override
+  State<_TireEntryForm> createState() => _TireEntryFormState();
+}
+
+class _TireEntryFormState extends State<_TireEntryForm> {
+  final _formKey = GlobalKey<FormState>();
+  final _brandController = TextEditingController();
+  final _widthController = TextEditingController();
+  final _profileController = TextEditingController();
+  final _quantityController = TextEditingController();
+  final _priceController = TextEditingController();
+  final _suggestedPriceController = TextEditingController();
+  final _modelController = TextEditingController();
+
+  BrandOption? _selectedBrand;
+  Owner? _selectedOwner;
+  CatalogChoiceOption? _selectedTireType;
+  CatalogChoiceOption? _selectedRimDiameter;
+  CatalogChoiceOption? _selectedOrigin;
+  CatalogChoiceOption? _selectedPlyRating;
+  CatalogChoiceOption? _selectedTreadType;
+  CatalogChoiceOption? _selectedLetterColor;
+
+  bool _isSubmitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedOwner = widget.choices.owners.isNotEmpty ? widget.choices.owners.first : null;
+  }
+
+  @override
+  void dispose() {
+    _brandController.dispose();
+    _widthController.dispose();
+    _profileController.dispose();
+    _quantityController.dispose();
+    _priceController.dispose();
+    _suggestedPriceController.dispose();
+    _modelController.dispose();
+    super.dispose();
   }
 
   bool get _showProfileField {
@@ -132,7 +211,8 @@ class _TireEntryScreenState extends State<TireEntryScreen> {
       return requiredError;
     }
 
-    if (double.tryParse(value!.trim()) == null) {
+    final parsed = double.tryParse(value!.trim());
+    if (parsed == null || parsed <= 0) {
       return 'Ingresa un número válido en $fieldName';
     }
 
@@ -157,9 +237,7 @@ class _TireEntryScreenState extends State<TireEntryScreen> {
         _selectedTreadType == null ||
         _selectedLetterColor == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Completa todos los selectores obligatorios.'),
-        ),
+        const SnackBar(content: Text('Completa todos los selectores obligatorios.')),
       );
       return;
     }
@@ -169,7 +247,7 @@ class _TireEntryScreenState extends State<TireEntryScreen> {
     });
 
     try {
-      final response = await _apiService.postStockReceipt(
+      final response = await widget.apiService.postStockReceipt(
         tireType: _selectedTireType!.value,
         brandId: _selectedBrand!.id,
         ownerId: _selectedOwner!.id,
@@ -179,17 +257,13 @@ class _TireEntryScreenState extends State<TireEntryScreen> {
         treadType: _selectedTreadType!.value,
         letterColor: _selectedLetterColor!.value,
         width: int.parse(_widthController.text.trim()),
-        aspectRatio: _showProfileField
-            ? int.parse(_profileController.text.trim())
-            : null,
+        aspectRatio: _showProfileField ? int.parse(_profileController.text.trim()) : null,
         quantity: int.parse(_quantityController.text.trim()),
-        unitPurchasePrice: _priceController.text.trim(),
+        unitPurchasePrice: double.parse(_priceController.text.trim()).toStringAsFixed(2),
         recommendedSalePrice: _suggestedPriceController.text.trim().isEmpty
             ? null
-            : _suggestedPriceController.text.trim(),
-        model: _modelController.text.trim().isEmpty
-            ? null
-            : _modelController.text.trim(),
+            : double.parse(_suggestedPriceController.text.trim()).toStringAsFixed(2),
+        model: _modelController.text.trim().isEmpty ? null : _modelController.text.trim(),
       );
 
       if (!mounted) {
@@ -200,9 +274,7 @@ class _TireEntryScreenState extends State<TireEntryScreen> {
       final stockAfter = response['stock_after'];
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            'Ingreso registrado. Recibo #$receiptId | Stock: $stockAfter',
-          ),
+          content: Text('Ingreso de llanta registrado. Recibo #$receiptId | Stock: $stockAfter'),
         ),
       );
 
@@ -212,12 +284,8 @@ class _TireEntryScreenState extends State<TireEntryScreen> {
         return;
       }
 
-      final message = error is ApiException
-          ? error.message
-          : 'No se pudo registrar el ingreso.';
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(message)));
+      final message = error is ApiException ? error.message : 'No se pudo registrar el ingreso.';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
     } finally {
       if (mounted) {
         setState(() {
@@ -239,9 +307,7 @@ class _TireEntryScreenState extends State<TireEntryScreen> {
 
     setState(() {
       _selectedBrand = null;
-      _selectedOwner = _choices != null && _choices!.owners.isNotEmpty
-          ? _choices!.owners.first
-          : null;
+      _selectedOwner = widget.choices.owners.isNotEmpty ? widget.choices.owners.first : null;
       _selectedTireType = null;
       _selectedRimDiameter = null;
       _selectedOrigin = null;
@@ -265,7 +331,7 @@ class _TireEntryScreenState extends State<TireEntryScreen> {
           .map(
             (option) => DropdownMenuItem<CatalogChoiceOption>(
               value: option,
-              child: Text(_apiService.translateLabel(fieldKey, option)),
+              child: Text(widget.apiService.translateLabel(fieldKey, option)),
             ),
           )
           .toList(),
@@ -281,33 +347,7 @@ class _TireEntryScreenState extends State<TireEntryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    if (_loadError != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(_loadError!, textAlign: TextAlign.center),
-              const SizedBox(height: 16),
-              FilledButton(
-                onPressed: _loadInitialData,
-                child: const Text('Reintentar'),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    final choices = _choices;
-    if (choices == null) {
-      return const SizedBox.shrink();
-    }
+    final choices = widget.choices;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -320,24 +360,10 @@ class _TireEntryScreenState extends State<TireEntryScreen> {
               value: _selectedOwner,
               decoration: const InputDecoration(labelText: 'Dueño *'),
               items: choices.owners
-                  .map(
-                    (owner) => DropdownMenuItem<Owner>(
-                      value: owner,
-                      child: Text(owner.name),
-                    ),
-                  )
+                  .map((owner) => DropdownMenuItem<Owner>(value: owner, child: Text(owner.name)))
                   .toList(),
-              onChanged: (owner) {
-                setState(() {
-                  _selectedOwner = owner;
-                });
-              },
-              validator: (value) {
-                if (value == null) {
-                  return 'Selecciona Dueño';
-                }
-                return null;
-              },
+              onChanged: (owner) => setState(() => _selectedOwner = owner),
+              validator: (value) => value == null ? 'Selecciona Dueño' : null,
             ),
             const SizedBox(height: 12),
             _buildChoiceField(
@@ -360,11 +386,7 @@ class _TireEntryScreenState extends State<TireEntryScreen> {
               fieldKey: 'rim_diameter',
               items: choices.rimDiameters,
               value: _selectedRimDiameter,
-              onChanged: (value) {
-                setState(() {
-                  _selectedRimDiameter = value;
-                });
-              },
+              onChanged: (value) => setState(() => _selectedRimDiameter = value),
             ),
             const SizedBox(height: 12),
             TextFormField(
@@ -390,7 +412,7 @@ class _TireEntryScreenState extends State<TireEntryScreen> {
             BrandAutocompleteField(
               controller: _brandController,
               initialValue: _selectedBrand,
-              searchBrands: _apiService.searchBrands,
+              searchBrands: widget.apiService.searchBrands,
               onSelected: (brand) {
                 _selectedBrand = brand;
               },
@@ -401,11 +423,7 @@ class _TireEntryScreenState extends State<TireEntryScreen> {
               fieldKey: 'origin',
               items: choices.origins,
               value: _selectedOrigin,
-              onChanged: (value) {
-                setState(() {
-                  _selectedOrigin = value;
-                });
-              },
+              onChanged: (value) => setState(() => _selectedOrigin = value),
             ),
             const SizedBox(height: 12),
             _buildChoiceField(
@@ -413,11 +431,7 @@ class _TireEntryScreenState extends State<TireEntryScreen> {
               fieldKey: 'ply_rating',
               items: choices.plyRatings,
               value: _selectedPlyRating,
-              onChanged: (value) {
-                setState(() {
-                  _selectedPlyRating = value;
-                });
-              },
+              onChanged: (value) => setState(() => _selectedPlyRating = value),
             ),
             const SizedBox(height: 12),
             _buildChoiceField(
@@ -425,11 +439,7 @@ class _TireEntryScreenState extends State<TireEntryScreen> {
               fieldKey: 'tread_type',
               items: choices.treadTypes,
               value: _selectedTreadType,
-              onChanged: (value) {
-                setState(() {
-                  _selectedTreadType = value;
-                });
-              },
+              onChanged: (value) => setState(() => _selectedTreadType = value),
             ),
             const SizedBox(height: 12),
             _buildChoiceField(
@@ -437,13 +447,8 @@ class _TireEntryScreenState extends State<TireEntryScreen> {
               fieldKey: 'letter_color',
               items: choices.letterColors,
               value: _selectedLetterColor,
-              onChanged: (value) {
-                setState(() {
-                  _selectedLetterColor = value;
-                });
-              },
+              onChanged: (value) => setState(() => _selectedLetterColor = value),
             ),
-
             const SizedBox(height: 12),
             TextFormField(
               controller: _quantityController,
@@ -456,47 +461,29 @@ class _TireEntryScreenState extends State<TireEntryScreen> {
             const SizedBox(height: 12),
             TextFormField(
               controller: _priceController,
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
-              inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
-              ],
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
               textInputAction: TextInputAction.next,
-              decoration: const InputDecoration(
-                labelText: 'Precio de compra *',
-              ),
-              validator: (value) =>
-                  _decimalValidator(value, 'Precio de compra'),
+              decoration: const InputDecoration(labelText: 'Precio de compra *'),
+              validator: (value) => _decimalValidator(value, 'Precio de compra'),
             ),
             const SizedBox(height: 12),
             TextFormField(
               controller: _suggestedPriceController,
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
-              inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
-              ],
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
               textInputAction: TextInputAction.next,
               decoration: const InputDecoration(
                 labelText: 'Precio sugerido de venta',
                 hintText: 'Opcional',
               ),
-              validator: (value) => _decimalValidator(
-                value,
-                'Precio sugerido de venta',
-                required: false,
-              ),
+              validator: (value) => _decimalValidator(value, 'Precio sugerido de venta', required: false),
             ),
             const SizedBox(height: 12),
             TextFormField(
               controller: _modelController,
               textInputAction: TextInputAction.done,
-              decoration: const InputDecoration(
-                labelText: 'Modelo',
-                hintText: 'Opcional',
-              ),
+              decoration: const InputDecoration(labelText: 'Modelo', hintText: 'Opcional'),
             ),
             const SizedBox(height: 20),
             FilledButton.icon(
@@ -508,7 +495,406 @@ class _TireEntryScreenState extends State<TireEntryScreen> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Icon(Icons.save_outlined),
-              label: Text(_isSubmitting ? 'Guardando...' : 'Guardar'),
+              label: Text(_isSubmitting ? 'Guardando...' : 'Guardar LLANTA'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RimEntryForm extends StatefulWidget {
+  const _RimEntryForm({required this.choices, required this.apiService});
+
+  final CatalogChoices choices;
+  final CatalogApiService apiService;
+
+  @override
+  State<_RimEntryForm> createState() => _RimEntryFormState();
+}
+
+class _RimEntryFormState extends State<_RimEntryForm> {
+  final _formKey = GlobalKey<FormState>();
+  final _internalCodeController = TextEditingController();
+  final _quantityController = TextEditingController();
+  final _priceController = TextEditingController();
+  final _suggestedPriceController = TextEditingController();
+  final _notesController = TextEditingController();
+
+  List<BrandOption> _rimBrands = const [];
+  Owner? _selectedOwner;
+  BrandOption? _selectedBrand;
+  CatalogChoiceOption? _selectedDiameter;
+  CatalogChoiceOption? _selectedHoles;
+  CatalogChoiceOption? _selectedWidth;
+  CatalogChoiceOption? _selectedMaterial;
+
+  bool _isSet = false;
+  bool _isLoadingBrands = true;
+  String? _brandsError;
+  bool _isSubmitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedOwner = widget.choices.owners.isNotEmpty ? widget.choices.owners.first : null;
+    _loadRimBrands();
+  }
+
+  @override
+  void dispose() {
+    _internalCodeController.dispose();
+    _quantityController.dispose();
+    _priceController.dispose();
+    _suggestedPriceController.dispose();
+    _notesController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadRimBrands() async {
+    setState(() {
+      _isLoadingBrands = true;
+      _brandsError = null;
+    });
+
+    try {
+      final brands = await widget.apiService.fetchRimBrands();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _rimBrands = brands;
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _brandsError = error.toString();
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingBrands = false;
+        });
+      }
+    }
+  }
+
+  String? _requiredTextValidator(String? value, String fieldName) {
+    if (value == null || value.trim().isEmpty) {
+      return 'El campo $fieldName es obligatorio';
+    }
+    return null;
+  }
+
+  String? _positiveIntValidator(String? value, String fieldName, {bool required = true}) {
+    if (!required && (value == null || value.trim().isEmpty)) {
+      return null;
+    }
+    final parsed = int.tryParse((value ?? '').trim());
+    if (parsed == null || parsed <= 0) {
+      return 'Ingresa $fieldName > 0';
+    }
+    return null;
+  }
+
+  String? _positiveDecimalValidator(String? value, String fieldName, {bool required = true}) {
+    if (!required && (value == null || value.trim().isEmpty)) {
+      return null;
+    }
+    final parsed = double.tryParse((value ?? '').trim());
+    if (parsed == null || parsed <= 0) {
+      return 'Ingresa $fieldName > 0';
+    }
+    return null;
+  }
+
+  String _toPrice(String raw) => double.parse(raw.trim()).toStringAsFixed(2);
+
+  Future<void> _submit() async {
+    final form = _formKey.currentState;
+    if (form == null || !form.validate()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Revisa los campos obligatorios.')),
+      );
+      return;
+    }
+
+    if (_selectedOwner == null ||
+        _selectedBrand == null ||
+        _selectedDiameter == null ||
+        _selectedHoles == null ||
+        _selectedWidth == null ||
+        _selectedMaterial == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Completa todos los selectores obligatorios.')),
+      );
+      return;
+    }
+
+    final quantity = _isSet ? 1 : int.parse(_quantityController.text.trim());
+
+    setState(() {
+      _isSubmitting = true;
+    });
+
+    try {
+      final request = RimReceiptRequest(
+        ownerId: _selectedOwner!.id,
+        brandId: _selectedBrand!.id,
+        internalCode: _internalCodeController.text.trim(),
+        rimDiameter: _selectedDiameter!.value,
+        holes: int.parse(_selectedHoles!.value),
+        widthIn: int.parse(_selectedWidth!.value),
+        material: _selectedMaterial!.value,
+        isSet: _isSet,
+        quantity: quantity,
+        unitPurchasePrice: _toPrice(_priceController.text),
+        suggestedSalePrice: _suggestedPriceController.text.trim().isEmpty
+            ? null
+            : _toPrice(_suggestedPriceController.text),
+        notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
+      );
+
+      await widget.apiService.postRimReceipt(request);
+
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ingreso de aro registrado.')),
+      );
+      _resetForm();
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      final message = error is ApiException ? error.message : 'No se pudo registrar el ingreso de aro.';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
+    }
+  }
+
+  void _resetForm() {
+    _formKey.currentState?.reset();
+    _internalCodeController.clear();
+    _quantityController.clear();
+    _priceController.clear();
+    _suggestedPriceController.clear();
+    _notesController.clear();
+    setState(() {
+      _selectedOwner = widget.choices.owners.isNotEmpty ? widget.choices.owners.first : null;
+      _selectedBrand = null;
+      _selectedDiameter = null;
+      _selectedHoles = null;
+      _selectedWidth = null;
+      _selectedMaterial = null;
+      _isSet = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoadingBrands) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_brandsError != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('No se pudieron cargar marcas de aros.\n$_brandsError', textAlign: TextAlign.center),
+              const SizedBox(height: 16),
+              FilledButton(onPressed: _loadRimBrands, child: const Text('Reintentar')),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            DropdownButtonFormField<Owner>(
+              value: _selectedOwner,
+              decoration: const InputDecoration(labelText: 'Dueño *'),
+              items: widget.choices.owners
+                  .map(
+                    (owner) => DropdownMenuItem<Owner>(
+                      value: owner,
+                      child: Text(owner.name),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (value) => setState(() => _selectedOwner = value),
+              validator: (value) => value == null ? 'Selecciona Dueño' : null,
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<BrandOption>(
+              value: _selectedBrand,
+              decoration: const InputDecoration(labelText: 'Marca *'),
+              items: _rimBrands
+                  .map(
+                    (brand) => DropdownMenuItem<BrandOption>(
+                      value: brand,
+                      child: Text(brand.name),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (value) => setState(() => _selectedBrand = value),
+              validator: (value) => value == null ? 'Selecciona Marca' : null,
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _internalCodeController,
+              textInputAction: TextInputAction.next,
+              decoration: const InputDecoration(labelText: 'Código interno *'),
+              validator: (value) => _requiredTextValidator(value, 'Código interno'),
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<CatalogChoiceOption>(
+              value: _selectedDiameter,
+              decoration: const InputDecoration(labelText: 'Diámetro *'),
+              items: widget.choices.rimDiameters
+                  .map(
+                    (option) => DropdownMenuItem<CatalogChoiceOption>(
+                      value: option,
+                      child: Text(option.label),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (value) => setState(() => _selectedDiameter = value),
+              validator: (value) => value == null ? 'Selecciona Diámetro' : null,
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<CatalogChoiceOption>(
+              value: _selectedHoles,
+              decoration: const InputDecoration(labelText: 'Número de huecos *'),
+              items: widget.choices.rimHoles
+                  .map(
+                    (option) => DropdownMenuItem<CatalogChoiceOption>(
+                      value: option,
+                      child: Text(option.label),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (value) => setState(() => _selectedHoles = value),
+              validator: (value) => value == null ? 'Selecciona Número de huecos' : null,
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<CatalogChoiceOption>(
+              value: _selectedWidth,
+              decoration: const InputDecoration(labelText: 'Ancho *'),
+              items: widget.choices.rimWidthsIn
+                  .map(
+                    (option) => DropdownMenuItem<CatalogChoiceOption>(
+                      value: option,
+                      child: Text(option.label),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (value) => setState(() => _selectedWidth = value),
+              validator: (value) => value == null ? 'Selecciona Ancho' : null,
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<CatalogChoiceOption>(
+              value: _selectedMaterial,
+              decoration: const InputDecoration(labelText: 'Material *'),
+              items: widget.choices.rimMaterials
+                  .map(
+                    (option) => DropdownMenuItem<CatalogChoiceOption>(
+                      value: option,
+                      child: Text(widget.apiService.translateLabel('rim_material', option)),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (value) => setState(() => _selectedMaterial = value),
+              validator: (value) => value == null ? 'Selecciona Material' : null,
+            ),
+            const SizedBox(height: 8),
+            CheckboxListTile(
+              value: _isSet,
+              onChanged: (value) {
+                setState(() {
+                  _isSet = value ?? false;
+                  if (_isSet) {
+                    _quantityController.text = '1';
+                  } else {
+                    _quantityController.clear();
+                  }
+                });
+              },
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Juego completo'),
+            ),
+            const SizedBox(height: 8),
+            TextFormField(
+              controller: _quantityController,
+              enabled: !_isSet,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              textInputAction: TextInputAction.next,
+              decoration: InputDecoration(
+                labelText: _isSet ? 'Cantidad (fijada en 1 por juego)' : 'Cantidad *',
+              ),
+              validator: (value) => _isSet
+                  ? null
+                  : _positiveIntValidator(value, 'Cantidad', required: true),
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _priceController,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
+              textInputAction: TextInputAction.next,
+              decoration: const InputDecoration(labelText: 'Precio compra unitario *'),
+              validator: (value) => _positiveDecimalValidator(value, 'Precio compra unitario'),
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _suggestedPriceController,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
+              textInputAction: TextInputAction.next,
+              decoration: const InputDecoration(
+                labelText: 'Precio sugerido',
+                hintText: 'Opcional (vacío = null)',
+              ),
+              validator: (value) => _positiveDecimalValidator(value, 'Precio sugerido', required: false),
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _notesController,
+              maxLines: 2,
+              textInputAction: TextInputAction.done,
+              decoration: const InputDecoration(labelText: 'Notas', hintText: 'Opcional'),
+            ),
+            const SizedBox(height: 20),
+            FilledButton.icon(
+              onPressed: _isSubmitting ? null : _submit,
+              icon: _isSubmitting
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.save_outlined),
+              label: Text(_isSubmitting ? 'Guardando...' : 'Guardar ARO'),
             ),
           ],
         ),

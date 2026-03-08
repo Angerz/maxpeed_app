@@ -87,6 +87,7 @@ class InventoryItem(models.Model):
     condition = models.CharField(max_length=8, choices=InventoryCondition.choices)
     stock = models.IntegerField(default=0)
     is_active = models.BooleanField(default=True)
+    deactivated_at = models.DateTimeField(null=True, blank=True)
     last_restock_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
