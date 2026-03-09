@@ -2,7 +2,118 @@ from decimal import Decimal
 
 from rest_framework import serializers
 
+from apps.catalog.choices import (
+    LetterColor,
+    Origin,
+    PlyRating,
+    RimDiameter,
+    RimHoles,
+    RimMaterial,
+    RimWidthIn,
+    TireType,
+    TreadType,
+)
+from apps.catalog.models import Brand, TireSpec
+from apps.inventory.models import Owner
 from apps.sales.models import Sale, SaleLine, SaleLineType
+
+
+class TradeInTirePayloadSerializer(serializers.Serializer):
+    owner_id = serializers.PrimaryKeyRelatedField(
+        source="owner",
+        queryset=Owner.objects.filter(is_active=True),
+        required=False,
+        allow_null=True,
+    )
+    brand_id = serializers.PrimaryKeyRelatedField(source="brand", queryset=Brand.objects.all())
+    tire_type = serializers.ChoiceField(choices=TireType.choices)
+    rim_diameter = serializers.ChoiceField(choices=RimDiameter.choices)
+    origin = serializers.ChoiceField(choices=Origin.choices)
+    ply_rating = serializers.ChoiceField(choices=PlyRating.choices)
+    tread_type = serializers.ChoiceField(choices=TreadType.choices)
+    letter_color = serializers.ChoiceField(choices=LetterColor.choices)
+    width = serializers.IntegerField(min_value=1)
+    aspect_ratio = serializers.IntegerField(min_value=1, required=False, allow_null=True)
+    model = serializers.CharField(required=False, allow_blank=True, allow_null=True, max_length=120)
+    suggested_sale_price = serializers.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        min_value=Decimal("0.01"),
+        required=False,
+        allow_null=True,
+    )
+
+    def validate_model(self, value):
+        if value is None:
+            return None
+        cleaned = value.strip()
+        return cleaned or None
+
+    def validate(self, attrs):
+        tire_type = attrs["tire_type"]
+        aspect_ratio = attrs.get("aspect_ratio")
+
+        if tire_type in TireSpec.ASPECT_RATIO_REQUIRED_TYPES and aspect_ratio is None:
+            raise serializers.ValidationError(
+                {"aspect_ratio": "aspect_ratio is required for this tire_type."}
+            )
+        if tire_type in {TireType.CARGO, TireType.CONVENTIONAL} and aspect_ratio is not None:
+            raise serializers.ValidationError(
+                {"aspect_ratio": "aspect_ratio must be omitted for this tire_type."}
+            )
+
+        owner = attrs.get("owner")
+        if owner is None:
+            owner = Owner.objects.filter(name__iexact="Maxpeed").first() or Owner.objects.order_by("id").first()
+            if owner is None:
+                raise serializers.ValidationError({"owner_id": "No owners configured in the system."})
+            attrs["owner"] = owner
+
+        if owner.name.upper() not in {"MAXPEED", "RUEL"}:
+            raise serializers.ValidationError({"owner_id": "Trade-in USED inventory owner must be Maxpeed or Ruel."})
+
+        return attrs
+
+
+class TradeInRimPayloadSerializer(serializers.Serializer):
+    owner_id = serializers.PrimaryKeyRelatedField(
+        source="owner",
+        queryset=Owner.objects.filter(is_active=True),
+        required=False,
+        allow_null=True,
+    )
+    brand_id = serializers.PrimaryKeyRelatedField(source="brand", queryset=Brand.objects.all())
+    internal_code = serializers.CharField(max_length=64)
+    rim_diameter = serializers.ChoiceField(choices=RimDiameter.choices)
+    holes = serializers.ChoiceField(choices=RimHoles.choices)
+    width_in = serializers.ChoiceField(choices=RimWidthIn.choices)
+    material = serializers.ChoiceField(choices=RimMaterial.choices)
+    is_set = serializers.BooleanField()
+    suggested_sale_price = serializers.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        min_value=Decimal("0.01"),
+        required=False,
+        allow_null=True,
+    )
+
+    def validate_internal_code(self, value):
+        cleaned = value.strip()
+        if not cleaned:
+            raise serializers.ValidationError("internal_code is required.")
+        return cleaned
+
+    def validate(self, attrs):
+        owner = attrs.get("owner")
+        if owner is None:
+            owner = Owner.objects.filter(name__iexact="Maxpeed").first() or Owner.objects.order_by("id").first()
+            if owner is None:
+                raise serializers.ValidationError({"owner_id": "No owners configured in the system."})
+            attrs["owner"] = owner
+
+        if owner.name.upper() not in {"MAXPEED", "RUEL"}:
+            raise serializers.ValidationError({"owner_id": "Trade-in USED inventory owner must be Maxpeed or Ruel."})
+        return attrs
 
 
 class SaleLineCreateSerializer(serializers.Serializer):
@@ -33,6 +144,9 @@ class SaleLineCreateSerializer(serializers.Serializer):
     )
     tire_condition_percent = serializers.IntegerField(min_value=10, max_value=100, required=False, allow_null=True)
     rim_requires_repair = serializers.BooleanField(required=False, allow_null=True)
+    notes = serializers.CharField(required=False, allow_blank=True, allow_null=True, max_length=1000)
+    tire = TradeInTirePayloadSerializer(required=False)
+    rim = TradeInRimPayloadSerializer(required=False)
 
     def validate(self, attrs):
         line_type = attrs["line_type"]
@@ -48,6 +162,8 @@ class SaleLineCreateSerializer(serializers.Serializer):
             attrs["assessed_value"] = None
             attrs["tire_condition_percent"] = None
             attrs["rim_requires_repair"] = None
+            attrs["tire"] = None
+            attrs["rim"] = None
             return attrs
 
         if line_type in SaleLineType.manual_values():
@@ -60,19 +176,32 @@ class SaleLineCreateSerializer(serializers.Serializer):
             attrs["assessed_value"] = None
             attrs["tire_condition_percent"] = None
             attrs["rim_requires_repair"] = None
+            attrs["tire"] = None
+            attrs["rim"] = None
             return attrs
 
         if attrs.get("assessed_value") is None:
             raise serializers.ValidationError({"assessed_value": "assessed_value is required."})
 
-        if line_type == SaleLineType.TRADEIN_TIRE and attrs.get("tire_condition_percent") is None:
-            raise serializers.ValidationError(
-                {"tire_condition_percent": "tire_condition_percent is required for TRADEIN_TIRE."}
-            )
-        if line_type == SaleLineType.TRADEIN_RIM and attrs.get("rim_requires_repair") is None:
-            raise serializers.ValidationError(
-                {"rim_requires_repair": "rim_requires_repair is required for TRADEIN_RIM."}
-            )
+        if line_type == SaleLineType.TRADEIN_TIRE:
+            if attrs.get("tire_condition_percent") is None:
+                raise serializers.ValidationError(
+                    {"tire_condition_percent": "tire_condition_percent is required for TRADEIN_TIRE."}
+                )
+            if attrs.get("tire") is None:
+                raise serializers.ValidationError({"tire": "TRADEIN_TIRE requires tire payload."})
+            attrs["rim"] = None
+
+        if line_type == SaleLineType.TRADEIN_RIM:
+            if attrs.get("rim_requires_repair") is None:
+                raise serializers.ValidationError(
+                    {"rim_requires_repair": "rim_requires_repair is required for TRADEIN_RIM."}
+                )
+            if attrs.get("rim") is None:
+                raise serializers.ValidationError({"rim": "TRADEIN_RIM requires rim payload."})
+            if attrs.get("rim", {}).get("is_set") and attrs.get("quantity") != 1:
+                raise serializers.ValidationError({"quantity": "For rim is_set=true, quantity must be 1."})
+            attrs["tire"] = None
 
         attrs["inventory_item_id"] = None
         attrs["unit_price"] = Decimal("0.00")
@@ -122,9 +251,16 @@ class SaleStockUpdateSerializer(serializers.Serializer):
 
 
 class SaleCreateResponseSerializer(serializers.Serializer):
+    class TradeInIngressSerializer(serializers.Serializer):
+        sale_line_id = serializers.IntegerField()
+        created_inventory_item_id = serializers.IntegerField()
+        catalog_item_id = serializers.IntegerField()
+        movement_id = serializers.IntegerField()
+
     sale_id = serializers.IntegerField()
     totals = SaleTotalsSerializer()
     stock_updates = SaleStockUpdateSerializer(many=True)
+    tradein_ingress = TradeInIngressSerializer(many=True)
     status = serializers.CharField()
 
 

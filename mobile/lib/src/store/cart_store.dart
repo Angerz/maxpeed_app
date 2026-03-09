@@ -14,7 +14,8 @@ class CartStore extends ChangeNotifier {
   List<CartLineManual> get manualLines => List.unmodifiable(_manualLines);
   List<TradeInLine> get tradeInLines => List.unmodifiable(_tradeInLines);
 
-  int get badgeCount => _products.length + _manualLines.length + _tradeInLines.length;
+  int get badgeCount =>
+      _products.length + _manualLines.length + _tradeInLines.length;
 
   double get subtotalProducts =>
       _products.fold(0, (sum, line) => sum + line.lineTotal);
@@ -132,8 +133,12 @@ class CartStore extends ChangeNotifier {
   void upsertTradeIn({
     int? id,
     required TradeInType type,
-    required double assessedValue,
+    required int quantity,
+    required double purchasePrice,
+    required String specsSummary,
     String? notes,
+    TradeInTireSpec? tireSpec,
+    TradeInRimSpec? rimSpec,
     int? conditionPercent,
     bool? needsRepair,
   }) {
@@ -142,8 +147,12 @@ class CartStore extends ChangeNotifier {
         TradeInLine(
           id: _nextId++,
           type: type,
-          assessedValue: assessedValue,
+          quantity: quantity,
+          purchasePrice: purchasePrice,
+          specsSummary: specsSummary,
           notes: notes,
+          tireSpec: tireSpec,
+          rimSpec: rimSpec,
           conditionPercent: conditionPercent,
           needsRepair: needsRepair,
         ),
@@ -153,8 +162,12 @@ class CartStore extends ChangeNotifier {
       if (index != -1) {
         _tradeInLines[index] = _tradeInLines[index].copyWith(
           type: type,
-          assessedValue: assessedValue,
+          quantity: quantity,
+          purchasePrice: purchasePrice,
+          specsSummary: specsSummary,
           notes: notes,
+          tireSpec: tireSpec,
+          rimSpec: rimSpec,
           conditionPercent: conditionPercent,
           needsRepair: needsRepair,
         );

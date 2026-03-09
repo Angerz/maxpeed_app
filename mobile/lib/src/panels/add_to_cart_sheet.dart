@@ -38,9 +38,7 @@ class _AddToCartSheetState extends State<AddToCartSheet> {
     super.initState();
     _suggestedPrice = widget.suggestedPrice;
     _quantityController = TextEditingController(text: '1');
-    _priceController = TextEditingController(
-      text: _suggestedPrice != null ? _suggestedPrice!.toStringAsFixed(2) : '',
-    );
+    _priceController = TextEditingController();
     if (_suggestedPrice == null && widget.loadSuggestedPrice != null) {
       _resolveSuggestedPrice();
     }
@@ -67,9 +65,6 @@ class _AddToCartSheetState extends State<AddToCartSheet> {
       }
       setState(() {
         _suggestedPrice = suggested;
-        if (suggested != null && _priceController.text.trim().isEmpty) {
-          _priceController.text = suggested.toStringAsFixed(2);
-        }
       });
     } finally {
       if (mounted) {
@@ -148,10 +143,12 @@ class _AddToCartSheetState extends State<AddToCartSheet> {
                   FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
                 ],
                 decoration: InputDecoration(
-                  labelText: 'Precio unitario *',
-                  hintText: _suggestedPrice != null
-                      ? 'Precio sugerido: ${_suggestedPrice!.toStringAsFixed(2)}'
-                      : 'Ingresa precio',
+                  labelText: _loadingSuggested
+                      ? 'Precio unitario (Sugerido: cargando...) *'
+                      : _suggestedPrice != null
+                      ? 'Precio unitario (Sugerido: S/ ${_suggestedPrice!.toStringAsFixed(2)}) *'
+                      : 'Precio unitario (Sugerido: —) *',
+                  hintText: 'Ingresa precio manualmente',
                 ),
                 validator: (value) {
                   final parsed = double.tryParse((value ?? '').trim());

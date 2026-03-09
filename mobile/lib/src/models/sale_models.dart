@@ -3,35 +3,44 @@ class SaleLineRequest {
     required this.lineType,
     this.inventoryItemId,
     this.description,
+    this.notes,
     this.quantity,
     this.unitPrice,
     this.discount,
     this.assessedValue,
     this.tireConditionPercent,
     this.rimRequiresRepair,
+    this.tire,
+    this.rim,
   });
 
   final String lineType;
   final int? inventoryItemId;
   final String? description;
+  final String? notes;
   final int? quantity;
   final String? unitPrice;
   final String? discount;
   final String? assessedValue;
   final int? tireConditionPercent;
   final bool? rimRequiresRepair;
+  final Map<String, dynamic>? tire;
+  final Map<String, dynamic>? rim;
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{
       'line_type': lineType,
       'inventory_item_id': inventoryItemId,
       'description': description,
+      'notes': notes,
       'quantity': quantity,
       'unit_price': unitPrice,
       'discount': discount,
       'assessed_value': assessedValue,
       'tire_condition_percent': tireConditionPercent,
       'rim_requires_repair': rimRequiresRepair,
+      'tire': tire,
+      'rim': rim,
     };
     json.removeWhere((_, value) => value == null);
     return json;

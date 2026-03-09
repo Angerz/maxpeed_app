@@ -28,7 +28,9 @@ class _CartScreenState extends State<CartScreen> {
   @override
   void initState() {
     super.initState();
-    _discountController.text = widget.cartStore.discountTotal.toStringAsFixed(2);
+    _discountController.text = widget.cartStore.discountTotal.toStringAsFixed(
+      2,
+    );
   }
 
   @override
@@ -47,7 +49,9 @@ class _CartScreenState extends State<CartScreen> {
     for (final product in widget.cartStore.products) {
       lines.add(
         SaleLineRequest(
-          lineType: product.itemType == CartProductType.tire ? 'INVENTORY_TIRE' : 'INVENTORY_RIM',
+          lineType: product.itemType == CartProductType.tire
+              ? 'INVENTORY_TIRE'
+              : 'INVENTORY_RIM',
           inventoryItemId: product.inventoryItemId,
           quantity: product.quantity,
           unitPrice: _price(product.unitPrice),
@@ -58,7 +62,8 @@ class _CartScreenState extends State<CartScreen> {
 
     for (final manual in widget.cartStore.manualLines) {
       if (manual.type == ManualLineType.service) {
-        final description = manual.detailNote == null || manual.detailNote!.trim().isEmpty
+        final description =
+            manual.detailNote == null || manual.detailNote!.trim().isEmpty
             ? manual.description
             : '${manual.description} - Nota: ${manual.detailNote!.trim()}';
         lines.add(
@@ -82,24 +87,36 @@ class _CartScreenState extends State<CartScreen> {
     }
 
     for (final tradeIn in widget.cartStore.tradeInLines) {
-      lines.add(
-        SaleLineRequest(
-          lineType: tradeIn.type == TradeInType.tire ? 'TRADEIN_TIRE' : 'TRADEIN_RIM',
-          description: tradeIn.summary +
-              ((tradeIn.notes == null || tradeIn.notes!.trim().isEmpty)
-                  ? ''
-                  : ' - ${tradeIn.notes!.trim()}'),
-          quantity: 1,
-          assessedValue: _price(tradeIn.assessedValue),
-          tireConditionPercent: tradeIn.type == TradeInType.tire ? tradeIn.conditionPercent : null,
-          rimRequiresRepair: tradeIn.type == TradeInType.rim ? tradeIn.needsRepair : null,
-        ),
-      );
+      if (tradeIn.type == TradeInType.tire) {
+        lines.add(
+          SaleLineRequest(
+            lineType: 'TRADEIN_TIRE',
+            quantity: tradeIn.quantity,
+            assessedValue: _price(tradeIn.purchasePrice),
+            tireConditionPercent: tradeIn.conditionPercent,
+            notes: tradeIn.notes,
+            tire: tradeIn.tireSpec?.toJson(),
+          ),
+        );
+      } else {
+        lines.add(
+          SaleLineRequest(
+            lineType: 'TRADEIN_RIM',
+            quantity: tradeIn.quantity,
+            assessedValue: _price(tradeIn.purchasePrice),
+            rimRequiresRepair: tradeIn.needsRepair,
+            notes: tradeIn.notes,
+            rim: tradeIn.rimSpec?.toJson(),
+          ),
+        );
+      }
     }
 
     return SaleCreateRequest(
       discountTotal: _price(widget.cartStore.discountTotal),
-      notes: _saleNotesController.text.trim().isEmpty ? null : _saleNotesController.text.trim(),
+      notes: _saleNotesController.text.trim().isEmpty
+          ? null
+          : _saleNotesController.text.trim(),
       lines: lines,
     );
   }
@@ -195,15 +212,19 @@ class _CartScreenState extends State<CartScreen> {
     }
     widget.cartStore.upsertTradeIn(
       type: result.type,
-      assessedValue: result.assessedValue,
+      quantity: result.quantity,
+      purchasePrice: result.purchasePrice,
+      specsSummary: result.specsSummary,
       notes: result.notes,
+      tireSpec: result.tireSpec,
+      rimSpec: result.rimSpec,
       conditionPercent: result.conditionPercent,
       needsRepair: result.needsRepair,
     );
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Trade-in agregado')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Trade-in agregado')));
     }
   }
 
@@ -230,10 +251,8 @@ class _CartScreenState extends State<CartScreen> {
         context: context,
         isScrollControlled: true,
         showDragHandle: true,
-        builder: (_) => AddServiceLineSheet(
-          apiService: _apiService,
-          initialLine: line,
-        ),
+        builder: (_) =>
+            AddServiceLineSheet(apiService: _apiService, initialLine: line),
       );
       if (result == null) {
         return;
@@ -252,9 +271,7 @@ class _CartScreenState extends State<CartScreen> {
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      builder: (_) => AddManualLineSheet(
-        initialLine: line,
-      ),
+      builder: (_) => AddManualLineSheet(initialLine: line),
     );
     if (result == null) {
       return;
@@ -281,8 +298,12 @@ class _CartScreenState extends State<CartScreen> {
     widget.cartStore.upsertTradeIn(
       id: line.id,
       type: result.type,
-      assessedValue: result.assessedValue,
+      quantity: result.quantity,
+      purchasePrice: result.purchasePrice,
+      specsSummary: result.specsSummary,
       notes: result.notes,
+      tireSpec: result.tireSpec,
+      rimSpec: result.rimSpec,
       conditionPercent: result.conditionPercent,
       needsRepair: result.needsRepair,
     );
@@ -291,7 +312,20 @@ class _CartScreenState extends State<CartScreen> {
   Future<void> _finalizarVenta() async {
     if (!widget.cartStore.hasSaleLines) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Agrega al menos un producto, servicio o accesorio.')),
+        const SnackBar(
+          content: Text('Agrega al menos un producto, servicio o accesorio.'),
+        ),
+      );
+      return;
+    }
+
+    if (widget.cartStore.tradeInLines.any((line) => !line.isComplete)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Completa los datos del trade-in antes de finalizar la venta.',
+          ),
+        ),
       );
       return;
     }
@@ -320,14 +354,18 @@ class _CartScreenState extends State<CartScreen> {
         if (error.statusCode == 409) {
           message = 'Stock insuficiente. ${error.message}';
         } else if (error.statusCode == 403) {
-          message = 'No está permitido vender aros de ALDO';
+          message = 'No autorizado. ${error.message}';
         } else if (error.statusCode == 400) {
-          message = error.message;
+          message = widget.cartStore.tradeInLines.isNotEmpty
+              ? 'Faltan datos del trade-in. ${error.message}'
+              : error.message;
         } else {
           message = error.message;
         }
       }
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
     } finally {
       if (mounted) {
         setState(() {
@@ -342,7 +380,9 @@ class _CartScreenState extends State<CartScreen> {
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
       child: Text(
         text,
-        style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+        style: Theme.of(
+          context,
+        ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
       ),
     );
   }
@@ -365,122 +405,162 @@ class _CartScreenState extends State<CartScreen> {
       body: AnimatedBuilder(
         animation: store,
         builder: (context, _) {
+          final showProducts = store.products.isNotEmpty;
+          final showManual = store.manualLines.isNotEmpty;
+          final showTradeIn = store.tradeInLines.isNotEmpty;
+          final hasAnything = showProducts || showManual || showTradeIn;
+
           return ListView(
             padding: const EdgeInsets.only(bottom: 130),
             children: [
-              _sectionTitle('Productos'),
-              if (store.products.isEmpty)
-                const ListTile(title: Text('Sin productos en el carrito')),
-              ...store.products.map(
-                (line) => ListTile(
-                  title: Text('${line.displayCode} | ${line.brand}'),
-                  subtitle: Text(
-                    'Owner: ${line.ownerName} | ${line.quantity} x ${_money(line.unitPrice)}',
-                  ),
-                  trailing: Text(_money(line.lineTotal)),
-                  onTap: () => _editProductLine(line),
-                  leading: IconButton(
-                    icon: const Icon(Icons.delete_outline),
-                    onPressed: () => store.removeProductLine(line.id),
-                  ),
-                ),
-              ),
-              _sectionTitle('Servicios y accesorios'),
-              if (store.manualLines.isEmpty)
-                const ListTile(title: Text('Sin servicios o accesorios')),
-              ...store.manualLines.map(
-                (line) => ListTile(
-                  title: Text(line.description),
-                  subtitle: Text(
-                    line.type == ManualLineType.service
-                        ? (line.detailNote == null || line.detailNote!.trim().isEmpty
-                            ? 'Servicio'
-                            : 'Servicio | ${line.detailNote}')
-                        : 'Accesorio',
-                  ),
-                  trailing: Text(_money(line.amount)),
-                  onTap: () => _editManualLine(line),
-                  leading: IconButton(
-                    icon: const Icon(Icons.delete_outline),
-                    onPressed: () => store.removeManualLine(line.id),
+              if (!hasAnything)
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(24, 120, 24, 0),
+                  child: Column(
+                    children: [
+                      Icon(Icons.shopping_cart_outlined, size: 52),
+                      SizedBox(height: 12),
+                      Text(
+                        'Nada fue seleccionado para su venta',
+                        textAlign: TextAlign.center,
+                      ),
+                      SizedBox(height: 6),
+                      Text(
+                        'Agrega productos desde el inventario o usa + para servicios/accesorios/trade-in.',
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
                   ),
                 ),
-              ),
-              _sectionTitle('Trade-in (parte de pago)'),
-              if (store.tradeInLines.isEmpty)
-                const ListTile(title: Text('Sin trade-in agregado')),
-              ...store.tradeInLines.map(
-                (line) => ListTile(
-                  title: Text(line.summary),
-                  subtitle: line.notes == null ? null : Text(line.notes!),
-                  trailing: Text('-${_money(line.assessedValue)}'),
-                  onTap: () => _editTradeInLine(line),
-                  leading: IconButton(
-                    icon: const Icon(Icons.delete_outline),
-                    onPressed: () => store.removeTradeIn(line.id),
+              if (showProducts) ...[
+                _sectionTitle('Productos'),
+                ...store.products.map(
+                  (line) => ListTile(
+                    title: Text('${line.displayCode} | ${line.brand}'),
+                    subtitle: Text(
+                      'Owner: ${line.ownerName} | ${line.quantity} x ${_money(line.unitPrice)}',
+                    ),
+                    trailing: Text(_money(line.lineTotal)),
+                    onTap: () => _editProductLine(line),
+                    leading: IconButton(
+                      icon: const Icon(Icons.delete_outline),
+                      onPressed: () => store.removeProductLine(line.id),
+                    ),
                   ),
                 ),
-              ),
-              const Divider(height: 30),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: TextField(
-                  controller: _discountController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(labelText: 'Descuento total'),
-                  onChanged: (value) {
-                    final parsed = double.tryParse(value.trim()) ?? 0;
-                    store.setDiscount(parsed);
-                  },
-                ),
-              ),
-              const SizedBox(height: 12),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: TextField(
-                  controller: _saleNotesController,
-                  maxLines: 2,
-                  decoration: const InputDecoration(
-                    labelText: 'Notas de venta',
-                    hintText: 'Opcional',
+              ],
+              if (showManual) ...[
+                _sectionTitle('Servicios y accesorios'),
+                ...store.manualLines.map(
+                  (line) => ListTile(
+                    title: Text(line.description),
+                    subtitle: Text(
+                      line.type == ManualLineType.service
+                          ? (line.detailNote == null ||
+                                    line.detailNote!.trim().isEmpty
+                                ? 'Servicio'
+                                : 'Servicio | ${line.detailNote}')
+                          : 'Accesorio',
+                    ),
+                    trailing: Text(_money(line.amount)),
+                    onTap: () => _editManualLine(line),
+                    leading: IconButton(
+                      icon: const Icon(Icons.delete_outline),
+                      onPressed: () => store.removeManualLine(line.id),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              ListTile(
-                title: const Text('Subtotal'),
-                trailing: Text(_money(store.subtotal)),
-              ),
-              ListTile(
-                title: const Text('Descuento total'),
-                trailing: Text(_money(store.discountTotal)),
-              ),
-              ListTile(
-                title: const Text('Total venta'),
-                trailing: Text(_money(store.totalVenta)),
-              ),
-              ListTile(
-                title: const Text('Crédito trade-in'),
-                trailing: Text(_money(store.tradeInCredit)),
-              ),
-              ListTile(
-                title: const Text('Total a pagar'),
-                trailing: Text(
-                  _money(store.totalPagar),
-                  style: Theme.of(context).textTheme.titleMedium,
+              ],
+              if (showTradeIn) ...[
+                _sectionTitle('Trade-in (parte de pago)'),
+                ...store.tradeInLines.map(
+                  (line) => ListTile(
+                    title: Text(line.summary),
+                    subtitle: Text(
+                      '${line.quantity} x ${_money(line.purchasePrice)}'
+                      '${line.notes == null || line.notes!.trim().isEmpty ? '' : ' | ${line.notes}'}',
+                    ),
+                    trailing: Text('-${_money(line.assessedValue)}'),
+                    onTap: () => _editTradeInLine(line),
+                    leading: IconButton(
+                      icon: const Icon(Icons.delete_outline),
+                      onPressed: () => store.removeTradeIn(line.id),
+                    ),
+                  ),
                 ),
-              ),
+              ],
+              if (hasAnything) ...[
+                const Divider(height: 30),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: TextField(
+                    controller: _discountController,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: const InputDecoration(
+                      labelText: 'Descuento total',
+                    ),
+                    onChanged: (value) {
+                      final parsed = double.tryParse(value.trim()) ?? 0;
+                      store.setDiscount(parsed);
+                    },
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: TextField(
+                    controller: _saleNotesController,
+                    maxLines: 2,
+                    decoration: const InputDecoration(
+                      labelText: 'Notas de venta',
+                      hintText: 'Opcional',
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                ListTile(
+                  title: const Text('Subtotal'),
+                  trailing: Text(_money(store.subtotal)),
+                ),
+                ListTile(
+                  title: const Text('Descuento total'),
+                  trailing: Text(_money(store.discountTotal)),
+                ),
+                ListTile(
+                  title: const Text('Total venta'),
+                  trailing: Text(_money(store.totalVenta)),
+                ),
+                ListTile(
+                  title: const Text('Crédito trade-in'),
+                  trailing: Text(_money(store.tradeInCredit)),
+                ),
+                ListTile(
+                  title: const Text('Total a pagar'),
+                  trailing: Text(
+                    _money(store.totalPagar),
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+              ],
             ],
           );
         },
       ),
-      bottomNavigationBar: SafeArea(
-        minimum: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-        child: FilledButton(
-          onPressed: _isSubmittingSale ? null : _finalizarVenta,
-          child: Text(_isSubmittingSale ? 'Registrando venta...' : 'Finalizar venta'),
-        ),
-      ),
+      bottomNavigationBar: widget.cartStore.badgeCount == 0
+          ? null
+          : SafeArea(
+              minimum: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+              child: FilledButton(
+                onPressed: _isSubmittingSale ? null : _finalizarVenta,
+                child: Text(
+                  _isSubmittingSale
+                      ? 'Registrando venta...'
+                      : 'Finalizar venta',
+                ),
+              ),
+            ),
     );
   }
 }

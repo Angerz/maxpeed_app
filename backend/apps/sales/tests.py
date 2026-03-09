@@ -9,13 +9,21 @@ from rest_framework.test import APITestCase
 
 from apps.catalog.choices import ItemKind, Origin, ProductCategory, TireType
 from apps.catalog.models import Brand, CatalogItem, RimSpec, TireSpec
-from apps.inventory.models import InventoryCondition, InventoryItem, Owner
+from apps.inventory.models import (
+    InventoryCondition,
+    InventoryItem,
+    MovementType,
+    Owner,
+    PriceRecord,
+    PriceType,
+)
 from apps.sales.models import Sale, SaleLineType
 
 
 class SaleApiTests(APITestCase):
     def setUp(self):
         self.maxpeed_owner, _ = Owner.objects.get_or_create(name="Maxpeed")
+        self.ruel_owner, _ = Owner.objects.get_or_create(name="Ruel")
         self.aldo_owner, _ = Owner.objects.get_or_create(name="ALDO")
 
         tire_brand = Brand.objects.create(name="AUSTONE")
@@ -76,6 +84,53 @@ class SaleApiTests(APITestCase):
         self.sales_url = reverse("sales-list-create")
         self.services_url = reverse("catalog-services")
 
+    def _tradein_tire_payload(self, **overrides):
+        payload = {
+            "line_type": SaleLineType.TRADEIN_TIRE,
+            "description": "Llanta usada",
+            "quantity": 1,
+            "assessed_value": "80.00",
+            "tire_condition_percent": 70,
+            "tire": {
+                "owner_id": self.maxpeed_owner.id,
+                "brand_id": self.tire_inventory.catalog_item.brand_id,
+                "tire_type": "RADIAL",
+                "rim_diameter": "R15",
+                "origin": "CHINA",
+                "ply_rating": "PR8",
+                "tread_type": "LINEAR",
+                "letter_color": "BLACK",
+                "width": 195,
+                "aspect_ratio": 65,
+                "model": "TRADEIN-X",
+                "suggested_sale_price": None,
+            },
+        }
+        payload.update(overrides)
+        return payload
+
+    def _tradein_rim_payload(self, **overrides):
+        payload = {
+            "line_type": SaleLineType.TRADEIN_RIM,
+            "description": "Aro usado",
+            "quantity": 1,
+            "assessed_value": "500.00",
+            "rim_requires_repair": True,
+            "rim": {
+                "owner_id": self.maxpeed_owner.id,
+                "brand_id": self.rim_inventory_aldo.catalog_item.brand_id,
+                "internal_code": "RIM-TRD-001",
+                "rim_diameter": "R15",
+                "holes": 5,
+                "width_in": 8,
+                "material": "ALUMINUM",
+                "is_set": True,
+                "suggested_sale_price": None,
+            },
+        }
+        payload.update(overrides)
+        return payload
+
     def test_create_sale_with_service_only(self):
         payload = {
             "discount_total": "0.00",
@@ -131,7 +186,7 @@ class SaleApiTests(APITestCase):
         response = self.client.post(self.sales_url, payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
 
-    def test_create_sale_rejects_aldo_rim_sale(self):
+    def test_create_sale_allows_aldo_rim_sale_and_decrements_stock(self):
         payload = {
             "lines": [
                 {
@@ -144,7 +199,13 @@ class SaleApiTests(APITestCase):
         }
 
         response = self.client.post(self.sales_url, payload, format="json")
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.rim_inventory_aldo.refresh_from_db()
+        self.assertEqual(self.rim_inventory_aldo.stock, 1)
+        self.assertEqual(
+            self.rim_inventory_aldo.movements.filter(movement_type=MovementType.SALE_OUT).count(),
+            1,
+        )
 
     def test_create_sale_with_tradein_sets_tradein_credit_total(self):
         payload = {
@@ -156,13 +217,7 @@ class SaleApiTests(APITestCase):
                     "quantity": 1,
                     "unit_price": "50.00",
                 },
-                {
-                    "line_type": SaleLineType.TRADEIN_TIRE,
-                    "description": "Llanta usada",
-                    "quantity": 1,
-                    "assessed_value": "20.00",
-                    "tire_condition_percent": 70,
-                },
+                self._tradein_tire_payload(assessed_value="20.00"),
             ],
         }
 
@@ -172,12 +227,89 @@ class SaleApiTests(APITestCase):
         self.assertEqual(response.data["totals"]["tradein_credit_total"], "20.00")
         self.assertEqual(response.data["totals"]["total"], "45.00")
         self.assertEqual(response.data["totals"]["total_due"], "25.00")
+        self.assertEqual(len(response.data["tradein_ingress"]), 1)
         self.assertTrue(
             InventoryItem.objects.filter(
                 condition=InventoryCondition.USED,
-                catalog_item__code="TRADEIN-TIRE",
+                catalog_item__model="TRADEIN-X",
             ).exists()
         )
+
+    def test_tradein_tire_creates_used_inventory_movement_and_purchase_price(self):
+        payload = {"lines": [self._tradein_tire_payload()]}
+        response = self.client.post(self.sales_url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        ingress = response.data["tradein_ingress"][0]
+        used_item = InventoryItem.objects.get(pk=ingress["created_inventory_item_id"])
+        self.assertEqual(used_item.condition, InventoryCondition.USED)
+        self.assertEqual(used_item.stock, 1)
+        self.assertEqual(
+            used_item.movements.filter(movement_type=MovementType.TRADEIN_IN).count(),
+            1,
+        )
+        purchase_price = PriceRecord.objects.get(
+            inventory_item=used_item,
+            price_type=PriceType.PURCHASE,
+            valid_to__isnull=True,
+        )
+        self.assertEqual(purchase_price.amount, Decimal("80.00"))
+
+    def test_tradein_rim_set_requires_and_ingests_quantity_one(self):
+        payload = {"lines": [self._tradein_rim_payload()]}
+        response = self.client.post(self.sales_url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        ingress = response.data["tradein_ingress"][0]
+        used_item = InventoryItem.objects.get(pk=ingress["created_inventory_item_id"])
+        self.assertEqual(used_item.condition, InventoryCondition.USED)
+        self.assertEqual(used_item.stock, 1)
+
+    def test_tradein_owner_aldo_is_rejected(self):
+        payload = {
+            "lines": [
+                self._tradein_tire_payload(
+                    tire={
+                        **self._tradein_tire_payload()["tire"],
+                        "owner_id": self.aldo_owner.id,
+                    }
+                )
+            ]
+        }
+        response = self.client.post(self.sales_url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_tradein_missing_nested_payload_returns_400(self):
+        payload = {
+            "lines": [
+                {
+                    "line_type": SaleLineType.TRADEIN_TIRE,
+                    "quantity": 1,
+                    "assessed_value": "100.00",
+                    "tire_condition_percent": 70,
+                }
+            ]
+        }
+        response = self.client.post(self.sales_url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_tradein_rim_internal_code_conflict_returns_409(self):
+        payload_ok = {"lines": [self._tradein_rim_payload()]}
+        first = self.client.post(self.sales_url, payload_ok, format="json")
+        self.assertEqual(first.status_code, status.HTTP_201_CREATED)
+
+        payload_conflict = {
+            "lines": [
+                self._tradein_rim_payload(
+                    rim={
+                        **self._tradein_rim_payload()["rim"],
+                        "holes": 6,
+                    }
+                )
+            ]
+        }
+        second = self.client.post(self.sales_url, payload_conflict, format="json")
+        self.assertEqual(second.status_code, status.HTTP_409_CONFLICT)
 
     def test_catalog_services_endpoint_excludes_tire_rim_accessory(self):
         response = self.client.get(self.services_url)

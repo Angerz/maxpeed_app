@@ -87,6 +87,32 @@ class _InventoryScreenState extends State<InventoryScreen> {
     }
   }
 
+  Future<void> _refreshTires() async {
+    try {
+      final response = await _apiService.fetchInventory(
+        includeZeroStock: _includeZeroStock,
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _tiresInventory = response;
+        _tiresError = null;
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'No se pudo refrescar inventario de llantas. ${error.toString()}',
+          ),
+        ),
+      );
+    }
+  }
+
   Future<void> _fetchRims() async {
     setState(() {
       _isLoadingRims = true;
@@ -119,6 +145,38 @@ class _InventoryScreenState extends State<InventoryScreen> {
         });
       }
     }
+  }
+
+  Future<void> _refreshRims() async {
+    try {
+      final response = await _apiService.fetchRimsInventory();
+      if (!mounted) {
+        return;
+      }
+      await _warmRimPhotoCache(response);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _rimsInventory = response;
+        _rimsError = null;
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'No se pudo refrescar inventario de aros. ${error.toString()}',
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> _refreshCurrentMode() {
+    return _mode == InventoryViewMode.tires ? _refreshTires() : _refreshRims();
   }
 
   int _rimNumber(String rimLabel) {
@@ -390,13 +448,29 @@ class _InventoryScreenState extends State<InventoryScreen> {
 
   Widget _buildTiresList() {
     if (_isLoadingTires) {
-      return const Center(child: CircularProgressIndicator());
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: const [
+          SizedBox(
+            height: 300,
+            child: Center(child: CircularProgressIndicator()),
+          ),
+        ],
+      );
     }
 
     if (_tiresError != null) {
-      return _buildError(
-        'No se pudo cargar inventario de llantas.\n$_tiresError',
-        _fetchTires,
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          SizedBox(
+            height: 360,
+            child: _buildError(
+              'No se pudo cargar inventario de llantas.\n$_tiresError',
+              _fetchTires,
+            ),
+          ),
+        ],
       );
     }
 
@@ -405,10 +479,19 @@ class _InventoryScreenState extends State<InventoryScreen> {
     final groupKeys = _sortGroupKeys(groups.keys);
 
     if (groupKeys.isEmpty) {
-      return const Center(child: Text('No hay llantas en inventario.'));
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: const [
+          SizedBox(
+            height: 300,
+            child: Center(child: Text('No hay llantas en inventario.')),
+          ),
+        ],
+      );
     }
 
     return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.only(top: 6, bottom: 16),
       children: groupKeys.expand((key) {
         final items = _filterAndSortTireItems(groups[key] ?? const []);
@@ -440,13 +523,29 @@ class _InventoryScreenState extends State<InventoryScreen> {
 
   Widget _buildRimsList() {
     if (_isLoadingRims) {
-      return const Center(child: CircularProgressIndicator());
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: const [
+          SizedBox(
+            height: 300,
+            child: Center(child: CircularProgressIndicator()),
+          ),
+        ],
+      );
     }
 
     if (_rimsError != null) {
-      return _buildError(
-        'No se pudo cargar inventario de aros.\n$_rimsError',
-        _fetchRims,
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          SizedBox(
+            height: 360,
+            child: _buildError(
+              'No se pudo cargar inventario de aros.\n$_rimsError',
+              _fetchRims,
+            ),
+          ),
+        ],
       );
     }
 
@@ -455,10 +554,19 @@ class _InventoryScreenState extends State<InventoryScreen> {
     final groupKeys = _sortGroupKeys(groups.keys);
 
     if (groupKeys.isEmpty) {
-      return const Center(child: Text('No hay aros en inventario.'));
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: const [
+          SizedBox(
+            height: 300,
+            child: Center(child: Text('No hay aros en inventario.')),
+          ),
+        ],
+      );
     }
 
     return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.only(top: 6, bottom: 16),
       children: groupKeys.expand((key) {
         final items = _filterAndSortRimItems(groups[key] ?? const []);
@@ -496,9 +604,12 @@ class _InventoryScreenState extends State<InventoryScreen> {
         _buildHeaderControls(),
         const SizedBox(height: 6),
         Expanded(
-          child: _mode == InventoryViewMode.tires
-              ? _buildTiresList()
-              : _buildRimsList(),
+          child: RefreshIndicator(
+            onRefresh: _refreshCurrentMode,
+            child: _mode == InventoryViewMode.tires
+                ? _buildTiresList()
+                : _buildRimsList(),
+          ),
         ),
       ],
     );

@@ -82,6 +82,45 @@ class _SalesScreenState extends State<SalesScreen> {
     }
   }
 
+  Future<void> _refreshSales() async {
+    setState(() {
+      _loadingMore = false;
+      _nextUrl = null;
+    });
+    try {
+      final page = await _apiService.fetchSales(
+        start: _activeStartDate,
+        end: _activeEndDate,
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _sales
+          ..clear()
+          ..addAll(page.results);
+        _nextUrl = page.next;
+        _summary = page.summary;
+        _error = null;
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      if (_sales.isEmpty) {
+        setState(() {
+          _error = error.toString();
+        });
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('No se pudo refrescar ventas. ${error.toString()}'),
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> _loadMore() async {
     if (_loadingMore || _nextUrl == null) {
       return;
@@ -204,7 +243,7 @@ class _SalesScreenState extends State<SalesScreen> {
   @override
   Widget build(BuildContext context) {
     return RefreshIndicator(
-      onRefresh: _loadInitial,
+      onRefresh: _refreshSales,
       child: CustomScrollView(
         controller: _scrollController,
         physics: const AlwaysScrollableScrollPhysics(),
@@ -301,16 +340,21 @@ class _SalesScreenState extends State<SalesScreen> {
               itemCount: _sales.length,
               itemBuilder: (context, index) {
                 final sale = _sales[index];
-                final due = sale.totalDue.isNotEmpty ? sale.totalDue : sale.total;
+                final due = sale.totalDue.isNotEmpty
+                    ? sale.totalDue
+                    : sale.total;
                 return Card(
-                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  margin: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
                   child: ListTile(
                     onTap: () => _openDetail(sale),
                     title: Text(
                       'Venta #${sale.id}',
-                      style: Theme.of(
-                        context,
-                      ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                     subtitle: Text(_formatDate(sale.soldAt)),
                     trailing: Column(
@@ -320,7 +364,8 @@ class _SalesScreenState extends State<SalesScreen> {
                         Text('Total: $due'),
                         if (sale.tradeinCreditTotal.isNotEmpty)
                           Text('Trade-in: ${sale.tradeinCreditTotal}'),
-                        if (sale.itemCount > 0) Text('Items: ${sale.itemCount}'),
+                        if (sale.itemCount > 0)
+                          Text('Items: ${sale.itemCount}'),
                       ],
                     ),
                   ),
