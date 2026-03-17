@@ -96,6 +96,13 @@ class InventoryItem(models.Model):
 
     class Meta:
         ordering = ["catalog_item__sku", "owner__name", "condition"]
+        permissions = [
+            ("view_inventory", "Can view inventory"),
+            ("view_zero_stock", "Can view zero stock inventory"),
+            ("create_stock_receipt", "Can create stock receipt"),
+            ("restock", "Can restock inventory"),
+            ("deactivate_rims", "Can deactivate rim inventory"),
+        ]
         constraints = [
             models.UniqueConstraint(
                 fields=["catalog_item", "condition", "owner"],

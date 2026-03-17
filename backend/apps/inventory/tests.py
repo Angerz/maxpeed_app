@@ -3,6 +3,7 @@ from decimal import Decimal
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.contrib.auth import get_user_model
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -24,6 +25,13 @@ from apps.inventory.services.core import set_current_price
 
 class StockReceiptApiTests(APITestCase):
     def setUp(self):
+        user_model = get_user_model()
+        self.auth_user = user_model.objects.create_user(username="inv_admin_1", password="testpass123")
+        self.auth_user.is_superuser = True
+        self.auth_user.is_staff = True
+        self.auth_user.save(update_fields=["is_superuser", "is_staff"])
+        self.client.force_authenticate(user=self.auth_user)
+
         self.brand = Brand.objects.create(name="AUSTONE")
         self.maxpeed, _ = Owner.objects.get_or_create(name="Maxpeed")
         self.ruel, _ = Owner.objects.get_or_create(name="Ruel")
@@ -227,6 +235,13 @@ class StockReceiptApiTests(APITestCase):
 
 class InventoryItemRestockApiTests(APITestCase):
     def setUp(self):
+        user_model = get_user_model()
+        self.auth_user = user_model.objects.create_user(username="inv_admin_2", password="testpass123")
+        self.auth_user.is_superuser = True
+        self.auth_user.is_staff = True
+        self.auth_user.save(update_fields=["is_superuser", "is_staff"])
+        self.client.force_authenticate(user=self.auth_user)
+
         self.owner, _ = Owner.objects.get_or_create(name="Maxpeed")
         self.brand = Brand.objects.create(name="MICHELIN")
         self.catalog_item = CatalogItem.objects.create(
@@ -350,6 +365,13 @@ class InventoryItemRestockApiTests(APITestCase):
 
 class RimReceiptApiTests(APITestCase):
     def setUp(self):
+        user_model = get_user_model()
+        self.auth_user = user_model.objects.create_user(username="inv_admin_3", password="testpass123")
+        self.auth_user.is_superuser = True
+        self.auth_user.is_staff = True
+        self.auth_user.save(update_fields=["is_superuser", "is_staff"])
+        self.client.force_authenticate(user=self.auth_user)
+
         self.owner, _ = Owner.objects.get_or_create(name="Maxpeed")
         self.brand = Brand.objects.create(name="ROMAX")
         self.receipt_url = reverse("inventory-rim-receipts")
@@ -431,6 +453,13 @@ class RimReceiptApiTests(APITestCase):
 
 class RimDeactivateApiTests(APITestCase):
     def setUp(self):
+        user_model = get_user_model()
+        self.auth_user = user_model.objects.create_user(username="inv_admin_4", password="testpass123")
+        self.auth_user.is_superuser = True
+        self.auth_user.is_staff = True
+        self.auth_user.save(update_fields=["is_superuser", "is_staff"])
+        self.client.force_authenticate(user=self.auth_user)
+
         self.aldo_owner, _ = Owner.objects.get_or_create(name="ALDO")
         self.maxpeed_owner, _ = Owner.objects.get_or_create(name="Maxpeed")
         self.brand, _ = Brand.objects.get_or_create(name="ROMAX")
@@ -540,6 +569,13 @@ class RimDeactivateApiTests(APITestCase):
 
 class InventoryImageApiTests(APITestCase):
     def setUp(self):
+        user_model = get_user_model()
+        self.auth_user = user_model.objects.create_user(username="inv_admin_5", password="testpass123")
+        self.auth_user.is_superuser = True
+        self.auth_user.is_staff = True
+        self.auth_user.save(update_fields=["is_superuser", "is_staff"])
+        self.client.force_authenticate(user=self.auth_user)
+
         self.owner, _ = Owner.objects.get_or_create(name="Maxpeed")
         self.brand = Brand.objects.create(name="MICHELIN")
         self.rim_brand = Brand.objects.create(name="ROMAX")
@@ -702,3 +738,63 @@ class InventoryImageApiTests(APITestCase):
         self.assertEqual(second.status_code, status.HTTP_201_CREATED)
         catalog_item.refresh_from_db()
         self.assertNotEqual(catalog_item.rim_spec.photo_image_id, first_photo_id)
+
+    def test_inventory_item_detail_for_rim_uses_rim_photo_then_brand_logo_fallback(self):
+        upload_url = reverse("catalog-brand-logo-upload", kwargs={"brand_id": self.rim_brand.id})
+        logo_response = self.client.post(upload_url, {"logo": self._fake_png(name="logo.png", body=b"logo")}, format="multipart")
+        self.assertEqual(logo_response.status_code, status.HTTP_201_CREATED)
+        logo_id = logo_response.data["logo_image"]["id"]
+
+        receipt_url = reverse("inventory-rim-receipts")
+        create_response = self.client.post(
+            receipt_url,
+            {
+                "owner_id": str(self.owner.id),
+                "brand_id": str(self.rim_brand.id),
+                "internal_code": "RIM-DETAIL-001",
+                "rim_diameter": "R17",
+                "holes": "5",
+                "width_in": "8",
+                "material": "ALUMINUM",
+                "is_set": "false",
+                "quantity": "1",
+                "unit_purchase_price": "500.00",
+                "suggested_sale_price": "650.00",
+                "rim_photo": self._fake_png(name="detail.png", body=b"detail"),
+            },
+            format="multipart",
+        )
+        self.assertEqual(create_response.status_code, status.HTTP_201_CREATED)
+        rim_inventory_id = create_response.data["inventory_item_id"]
+
+        detail_url = reverse("inventory-item-detail", kwargs={"inventory_item_id": rim_inventory_id})
+        detail_with_photo = self.client.get(detail_url)
+        self.assertEqual(detail_with_photo.status_code, status.HTTP_200_OK)
+        photo_id = CatalogItem.objects.get(id=create_response.data["catalog_item_id"]).rim_spec.photo_image_id
+        self.assertEqual(detail_with_photo.data["image"]["id"], photo_id)
+
+        update_response = self.client.post(
+            receipt_url,
+            {
+                "owner_id": str(self.owner.id),
+                "brand_id": str(self.rim_brand.id),
+                "internal_code": "RIM-DETAIL-001",
+                "rim_diameter": "R17",
+                "holes": "5",
+                "width_in": "8",
+                "material": "ALUMINUM",
+                "is_set": "false",
+                "quantity": "1",
+                "unit_purchase_price": "500.00",
+                "suggested_sale_price": "650.00",
+            },
+            format="multipart",
+        )
+        self.assertEqual(update_response.status_code, status.HTTP_201_CREATED)
+        catalog_item = CatalogItem.objects.get(id=create_response.data["catalog_item_id"])
+        catalog_item.rim_spec.photo_image = None
+        catalog_item.rim_spec.save(update_fields=["photo_image"])
+
+        detail_fallback = self.client.get(detail_url)
+        self.assertEqual(detail_fallback.status_code, status.HTTP_200_OK)
+        self.assertEqual(detail_fallback.data["image"]["id"], logo_id)

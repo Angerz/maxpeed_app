@@ -2,11 +2,12 @@ from datetime import date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 from django.db.models import Count
+from apps.accounts.permissions import CanCreateSale, CanViewSaleDetail, CanViewSales
 from django.utils import timezone
 from rest_framework import generics, status
 from rest_framework.exceptions import APIException, PermissionDenied, ValidationError
 from rest_framework.pagination import PageNumberPagination
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -34,8 +35,16 @@ class SalePagination(PageNumberPagination):
 
 
 class SaleListCreateAPIView(APIView):
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
     pagination_class = SalePagination
+
+    def get_permissions(self):
+        permissions = [IsAuthenticated()]
+        if self.request.method == "GET":
+            permissions.append(CanViewSales())
+        elif self.request.method == "POST":
+            permissions.append(CanCreateSale())
+        return permissions
 
     @staticmethod
     def _parse_date_param(raw_value, field_name):
@@ -113,7 +122,7 @@ class SaleListCreateAPIView(APIView):
 
 
 class SaleDetailAPIView(generics.RetrieveAPIView):
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated, CanViewSales, CanViewSaleDetail]
     serializer_class = SaleDetailSerializer
     lookup_url_kwarg = "sale_id"
     queryset = Sale.objects.select_related("created_by").prefetch_related("lines").order_by("-sold_at", "-id")

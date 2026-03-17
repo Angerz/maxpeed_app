@@ -2,6 +2,7 @@ from decimal import Decimal
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
+from django.contrib.auth import get_user_model
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework import status
@@ -22,6 +23,13 @@ from apps.sales.models import Sale, SaleLineType
 
 class SaleApiTests(APITestCase):
     def setUp(self):
+        user_model = get_user_model()
+        self.auth_user = user_model.objects.create_user(username="sales_admin", password="testpass123")
+        self.auth_user.is_superuser = True
+        self.auth_user.is_staff = True
+        self.auth_user.save(update_fields=["is_superuser", "is_staff"])
+        self.client.force_authenticate(user=self.auth_user)
+
         self.maxpeed_owner, _ = Owner.objects.get_or_create(name="Maxpeed")
         self.ruel_owner, _ = Owner.objects.get_or_create(name="Ruel")
         self.aldo_owner, _ = Owner.objects.get_or_create(name="ALDO")

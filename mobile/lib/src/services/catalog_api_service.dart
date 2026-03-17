@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 
@@ -9,12 +10,14 @@ import '../models/catalog_choice_option.dart';
 import '../models/catalog_choices.dart';
 import '../models/inventory_detail.dart';
 import '../models/inventory_group_response.dart';
+import '../models/login_response.dart';
 import '../models/rim_grouped_response.dart';
 import '../models/rim_receipt_request.dart';
 import '../models/restock_request.dart';
 import '../models/restock_response.dart';
 import '../models/sale_models.dart';
 import '../models/service_option.dart';
+import '../models/capabilities.dart';
 
 class ApiException implements Exception {
   const ApiException(this.message, {this.statusCode});
@@ -37,6 +40,16 @@ class CatalogApiService {
   final String host;
   final int port;
   static const Duration _requestTimeout = Duration(seconds: 8);
+  static String? _authToken;
+  static VoidCallback? _onUnauthorized;
+
+  static void setAuthToken(String? token) {
+    _authToken = token;
+  }
+
+  static void setUnauthorizedHandler(VoidCallback? callback) {
+    _onUnauthorized = callback;
+  }
 
   Future<CatalogChoices> fetchChoices() async {
     final uri = Uri.http('$host:$port', '/api/catalog/choices/');
@@ -121,7 +134,7 @@ class CatalogApiService {
       response = await _client
           .post(
             uri,
-            headers: const {'Content-Type': 'application/json'},
+            headers: _buildHeaders(json: true, authenticated: true),
             body: jsonEncode(payload),
           )
           .timeout(
@@ -236,7 +249,7 @@ class CatalogApiService {
       response = await _client
           .post(
             uri,
-            headers: const {'Content-Type': 'application/json'},
+            headers: _buildHeaders(json: true, authenticated: true),
             body: jsonEncode(requestPayload.toJson()),
           )
           .timeout(
@@ -274,7 +287,7 @@ class CatalogApiService {
       response = await _client
           .post(
             uri,
-            headers: const {'Content-Type': 'application/json'},
+            headers: _buildHeaders(json: true, authenticated: true),
             body: jsonEncode(request.toJson()),
           )
           .timeout(
@@ -308,6 +321,7 @@ class CatalogApiService {
     RimReceiptRequest request,
   ) async {
     final multipart = http.MultipartRequest('POST', uri);
+    multipart.headers.addAll(_buildHeaders(json: false, authenticated: true));
     multipart.fields.addAll(request.toFields());
 
     final bytes = request.rimPhotoBytes!;
@@ -447,7 +461,7 @@ class CatalogApiService {
       response = await _client
           .post(
             uri,
-            headers: const {'Content-Type': 'application/json'},
+            headers: _buildHeaders(json: true, authenticated: true),
             body: jsonEncode(payload),
           )
           .timeout(
@@ -492,7 +506,7 @@ class CatalogApiService {
       response = await _client
           .post(
             uri,
-            headers: const {'Content-Type': 'application/json'},
+            headers: _buildHeaders(json: true, authenticated: true),
             body: jsonEncode(request.toJson()),
           )
           .timeout(
@@ -554,10 +568,11 @@ class CatalogApiService {
     return SaleDetail.fromJson(response);
   }
 
-  Future<dynamic> _getJson(Uri uri) async {
+  Future<dynamic> _getJson(Uri uri, {bool authenticated = true}) async {
+    final tokenSnapshot = _authToken;
     try {
       final response = await _client
-          .get(uri)
+          .get(uri, headers: _buildHeaders(authenticated: authenticated))
           .timeout(
             _requestTimeout,
             onTimeout: () {
@@ -566,6 +581,12 @@ class CatalogApiService {
               );
             },
           );
+      if (response.statusCode == 401 &&
+          authenticated &&
+          (tokenSnapshot ?? '').isNotEmpty &&
+          tokenSnapshot == _authToken) {
+        _onUnauthorized?.call();
+      }
       return _decodeResponse(response);
     } on http.ClientException catch (error) {
       throw ApiException('Error de conexión: ${error.message}');
@@ -574,6 +595,66 @@ class CatalogApiService {
         'Tiempo de espera agotado al cargar datos. Verifica conexión y servidor.',
       );
     }
+  }
+
+  Future<LoginResponse> login({
+    required String username,
+    required String password,
+  }) async {
+    final uri = Uri.http('$host:$port', '/api/auth/login/');
+    http.Response response;
+    try {
+      response = await _client
+          .post(
+            uri,
+            headers: _buildHeaders(json: true, authenticated: false),
+            body: jsonEncode({'username': username, 'password': password}),
+          )
+          .timeout(
+            _requestTimeout,
+            onTimeout: () {
+              throw const ApiException(
+                'Tiempo de espera agotado al iniciar sesión.',
+              );
+            },
+          );
+    } on http.ClientException catch (error) {
+      throw ApiException('Error de conexión: ${error.message}');
+    } on TimeoutException {
+      throw const ApiException('Tiempo de espera agotado al iniciar sesión.');
+    }
+
+    final decoded = _decodeResponse(response);
+    if (decoded is! Map<String, dynamic>) {
+      throw const ApiException('Respuesta inválida al iniciar sesión');
+    }
+    return LoginResponse.fromJson(decoded);
+  }
+
+  Future<void> logout() async {
+    final uri = Uri.http('$host:$port', '/api/auth/logout/');
+    try {
+      final response = await _client
+          .post(
+            uri,
+            headers: _buildHeaders(json: true, authenticated: true),
+            body: jsonEncode(const <String, dynamic>{}),
+          )
+          .timeout(_requestTimeout);
+      _decodeResponse(response);
+    } catch (_) {
+      rethrow;
+    }
+  }
+
+  Future<Capabilities> fetchCapabilities() async {
+    final uri = Uri.http('$host:$port', '/api/capabilities/');
+    final response = await _getJson(uri, authenticated: true);
+    if (response is Map<String, dynamic>) {
+      final source = response['capabilities'] ?? response;
+      return Capabilities.fromDynamic(source);
+    }
+    return const Capabilities(<String, bool>{});
   }
 
   dynamic _decodeResponse(http.Response response) {
@@ -616,6 +697,20 @@ class CatalogApiService {
     }
 
     return 'Error de servidor ($statusCode)';
+  }
+
+  Map<String, String> _buildHeaders({
+    bool json = false,
+    bool authenticated = true,
+  }) {
+    final headers = <String, String>{};
+    if (json) {
+      headers['Content-Type'] = 'application/json';
+    }
+    if (authenticated && (_authToken ?? '').isNotEmpty) {
+      headers['Authorization'] = 'Token ${_authToken!}';
+    }
+    return headers;
   }
 
   String _toYmd(DateTime date) {

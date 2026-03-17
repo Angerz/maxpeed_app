@@ -54,6 +54,11 @@ class Sale(models.Model):
 
     class Meta:
         ordering = ["-sold_at", "-id"]
+        permissions = [
+            ("create_sale", "Can create sales"),
+            ("view_sales", "Can view sales list"),
+            ("view_sale_detail", "Can view sales detail"),
+        ]
 
     def clean(self):
         super().clean()

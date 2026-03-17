@@ -10,10 +10,12 @@ class InventoryDetailSheet extends StatefulWidget {
     super.key,
     required this.inventoryItemId,
     required this.apiService,
+    required this.canRestock,
   });
 
   final int inventoryItemId;
   final CatalogApiService apiService;
+  final bool canRestock;
 
   @override
   State<InventoryDetailSheet> createState() => _InventoryDetailSheetState();
@@ -73,10 +75,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
         padding: EdgeInsets.only(
           bottom: MediaQuery.of(context).viewInsets.bottom,
         ),
-        child: _RestockSheet(
-          detail: detail,
-          apiService: widget.apiService,
-        ),
+        child: _RestockSheet(detail: detail, apiService: widget.apiService),
       ),
     );
 
@@ -85,11 +84,13 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
     }
 
     if (success == true) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Restock registrado')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Restock registrado')));
       setState(() {
-        _future = widget.apiService.fetchInventoryDetail(widget.inventoryItemId);
+        _future = widget.apiService.fetchInventoryDetail(
+          widget.inventoryItemId,
+        );
       });
     }
   }
@@ -123,7 +124,9 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                     FilledButton(
                       onPressed: () {
                         setState(() {
-                          _future = widget.apiService.fetchInventoryDetail(widget.inventoryItemId);
+                          _future = widget.apiService.fetchInventoryDetail(
+                            widget.inventoryItemId,
+                          );
                         });
                       },
                       child: const Text('Reintentar'),
@@ -135,7 +138,10 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
 
             final detail = snapshot.data;
             if (detail == null) {
-              return const SizedBox(height: 200, child: Center(child: Text('Sin detalle.')));
+              return const SizedBox(
+                height: 200,
+                child: Center(child: Text('Sin detalle.')),
+              );
             }
 
             return SingleChildScrollView(
@@ -145,8 +151,8 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                   Text(
                     detail.code,
                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.w800,
-                        ),
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                   const SizedBox(height: 12),
                   _row('Código', detail.code),
@@ -160,14 +166,16 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                   _row('Último restock', _formatDate(detail.lastRestockAt)),
                   _row('Creado', _formatDate(detail.createdAt)),
                   _row('Actualizado', _formatDate(detail.updatedAt)),
-                  const SizedBox(height: 18),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () => _openRestock(detail),
-                      child: const Text('Restock'),
+                  if (widget.canRestock) ...[
+                    const SizedBox(height: 18),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () => _openRestock(detail),
+                        child: const Text('Restock'),
+                      ),
                     ),
-                  ),
+                  ],
                 ],
               ),
             );
@@ -179,10 +187,7 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
 }
 
 class _RestockSheet extends StatefulWidget {
-  const _RestockSheet({
-    required this.detail,
-    required this.apiService,
-  });
+  const _RestockSheet({required this.detail, required this.apiService});
 
   final InventoryDetail detail;
   final CatalogApiService apiService;
@@ -261,7 +266,9 @@ class _RestockSheetState extends State<_RestockSheet> {
         suggestedSalePrice: _suggestedController.text.trim().isEmpty
             ? null
             : _formatToTwoDecimals(_suggestedController.text),
-        notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
+        notes: _notesController.text.trim().isEmpty
+            ? null
+            : _notesController.text.trim(),
       );
 
       await widget.apiService.restockInventoryItem(
@@ -302,9 +309,9 @@ class _RestockSheetState extends State<_RestockSheet> {
               children: [
                 Text(
                   'Restock',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
                 ),
                 const SizedBox(height: 10),
                 Text('Código: ${widget.detail.code}'),
@@ -321,21 +328,33 @@ class _RestockSheetState extends State<_RestockSheet> {
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _purchaseController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
-                  decoration: const InputDecoration(labelText: 'Precio compra unitario *'),
-                  validator: (value) => _validateDecimalRequired(value, 'precio compra'),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+                  ],
+                  decoration: const InputDecoration(
+                    labelText: 'Precio compra unitario *',
+                  ),
+                  validator: (value) =>
+                      _validateDecimalRequired(value, 'precio compra'),
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _suggestedController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+                  ],
                   decoration: const InputDecoration(
                     labelText: 'Precio sugerido',
                     hintText: 'Opcional (vacío = null)',
                   ),
-                  validator: (value) => _validateDecimalOptional(value, 'precio sugerido'),
+                  validator: (value) =>
+                      _validateDecimalOptional(value, 'precio sugerido'),
                 ),
                 const SizedBox(height: 12),
                 TextFormField(

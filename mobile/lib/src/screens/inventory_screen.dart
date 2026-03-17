@@ -16,9 +16,20 @@ import '../widgets/tire_inventory_card.dart';
 enum InventoryViewMode { tires, rims }
 
 class InventoryScreen extends StatefulWidget {
-  const InventoryScreen({super.key, required this.cartStore});
+  const InventoryScreen({
+    super.key,
+    required this.cartStore,
+    required this.canCreateSale,
+    required this.canViewZeroStock,
+    required this.canRestock,
+    required this.canDeactivateRims,
+  });
 
   final CartStore cartStore;
+  final bool canCreateSale;
+  final bool canViewZeroStock;
+  final bool canRestock;
+  final bool canDeactivateRims;
 
   @override
   State<InventoryScreen> createState() => _InventoryScreenState();
@@ -52,6 +63,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
   }
 
   Future<void> _fetchTires() async {
+    final includeZero = widget.canViewZeroStock ? _includeZeroStock : false;
     setState(() {
       _isLoadingTires = true;
       _tiresError = null;
@@ -59,7 +71,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
 
     try {
       final response = await _apiService.fetchInventory(
-        includeZeroStock: _includeZeroStock,
+        includeZeroStock: includeZero,
       );
       if (!mounted) {
         return;
@@ -84,9 +96,10 @@ class _InventoryScreenState extends State<InventoryScreen> {
   }
 
   Future<void> _refreshTires() async {
+    final includeZero = widget.canViewZeroStock ? _includeZeroStock : false;
     try {
       final response = await _apiService.fetchInventory(
-        includeZeroStock: _includeZeroStock,
+        includeZeroStock: includeZero,
       );
       if (!mounted) {
         return;
@@ -224,6 +237,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
       builder: (_) => InventoryDetailSheet(
         inventoryItemId: item.inventoryItemId,
         apiService: _apiService,
+        canRestock: widget.canRestock,
       ),
     );
   }
@@ -233,7 +247,11 @@ class _InventoryScreenState extends State<InventoryScreen> {
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
-      builder: (_) => RimDetailSheet(item: item, apiService: _apiService),
+      builder: (_) => RimDetailSheet(
+        item: item,
+        apiService: _apiService,
+        canDeactivateRims: widget.canDeactivateRims,
+      ),
     );
 
     if (deactivated == true && mounted) {
@@ -242,6 +260,12 @@ class _InventoryScreenState extends State<InventoryScreen> {
   }
 
   Future<void> _addTireToCart(InventoryCardItem item) async {
+    if (!widget.canCreateSale) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('No autorizado')));
+      return;
+    }
     final cachedSuggested = _tireSuggestedPriceCache[item.inventoryItemId];
     final result = await showModalBottomSheet<AddToCartResult>(
       context: context,
@@ -277,6 +301,12 @@ class _InventoryScreenState extends State<InventoryScreen> {
   }
 
   Future<void> _addRimToCart(RimInventoryCardItem item) async {
+    if (!widget.canCreateSale) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('No autorizado')));
+      return;
+    }
     final result = await showModalBottomSheet<AddToCartResult>(
       context: context,
       isScrollControlled: true,
@@ -360,7 +390,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
             },
           ),
         ),
-        if (_mode == InventoryViewMode.tires)
+        if (_mode == InventoryViewMode.tires && widget.canViewZeroStock)
           SwitchListTile(
             title: const Text('Incluir sin stock'),
             value: _includeZeroStock,
@@ -480,7 +510,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
             (item) => TireInventoryCard(
               item: item,
               onTap: () => _openTireDetail(item),
-              onAdd: () => _addTireToCart(item),
+              onAdd: widget.canCreateSale ? () => _addTireToCart(item) : null,
             ),
           ),
         ];
@@ -555,7 +585,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
             (item) => RimInventoryCard(
               item: item,
               onTap: () => _openRimPreview(item),
-              onAdd: () => _addRimToCart(item),
+              onAdd: widget.canCreateSale ? () => _addRimToCart(item) : null,
             ),
           ),
         ];

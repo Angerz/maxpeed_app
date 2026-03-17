@@ -6,7 +6,9 @@ import '../services/catalog_api_service.dart';
 import '../widgets/sales_summary_panel.dart';
 
 class SalesScreen extends StatefulWidget {
-  const SalesScreen({super.key});
+  const SalesScreen({super.key, required this.canViewSaleDetail});
+
+  final bool canViewSaleDetail;
 
   @override
   State<SalesScreen> createState() => _SalesScreenState();
@@ -232,6 +234,12 @@ class _SalesScreenState extends State<SalesScreen> {
   }
 
   void _openDetail(SaleListItem sale) {
+    if (!widget.canViewSaleDetail) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('No autorizado')));
+      return;
+    }
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,

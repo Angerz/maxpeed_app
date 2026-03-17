@@ -9,10 +9,12 @@ class RimDetailSheet extends StatefulWidget {
     super.key,
     required this.item,
     required this.apiService,
+    required this.canDeactivateRims,
   });
 
   final RimInventoryCardItem item;
   final CatalogApiService apiService;
+  final bool canDeactivateRims;
 
   @override
   State<RimDetailSheet> createState() => _RimDetailSheetState();
@@ -24,6 +26,7 @@ class _RimDetailSheetState extends State<RimDetailSheet> {
   String? _error;
 
   bool get _canDeactivate =>
+      widget.canDeactivateRims &&
       widget.item.owner?.name.trim().toUpperCase() == 'ALDO';
 
   String get _logoAsset {

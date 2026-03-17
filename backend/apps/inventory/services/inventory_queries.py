@@ -100,6 +100,7 @@ def get_inventory_cards_grouped_by_rim(*, include_zero_stock=False):
 def get_inventory_item_detail_payload(inventory_item):
     catalog_item = inventory_item.catalog_item
     tire_spec = getattr(catalog_item, "tire_spec", None)
+    rim_spec = getattr(catalog_item, "rim_spec", None)
 
     detail_parts = [
         catalog_item.origin,
@@ -120,6 +121,13 @@ def get_inventory_item_detail_payload(inventory_item):
         fallback_last=fallback_last,
     )
 
+    if catalog_item.product_category == ProductCategory.RIM:
+        resolved_image = rim_spec.photo_image if rim_spec else None
+        if resolved_image is None and catalog_item.brand:
+            resolved_image = catalog_item.brand.logo_image
+    else:
+        resolved_image = catalog_item.brand.logo_image if catalog_item.brand else None
+
     return {
         "inventory_item_id": inventory_item.id,
         "code": catalog_item.code,
@@ -133,5 +141,5 @@ def get_inventory_item_detail_payload(inventory_item):
         "last_restock_at": inventory_item.last_restock_at,
         "created_at": inventory_item.created_at,
         "updated_at": inventory_item.updated_at,
-        "image": _build_image_ref(catalog_item.brand.logo_image if catalog_item.brand else None),
+        "image": _build_image_ref(resolved_image),
     }

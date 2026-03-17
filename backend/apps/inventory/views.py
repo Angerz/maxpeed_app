@@ -3,10 +3,17 @@ import os
 from rest_framework import status
 from rest_framework.generics import RetrieveAPIView
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.accounts.permissions import (
+    CanCreateStockReceipt,
+    CanDeactivateRims,
+    CanRestock,
+    CanViewInventory,
+)
+from apps.accounts.permissions import CanViewZeroStock
 from apps.images.models import ImageKind
 from apps.images.services import create_image_asset_from_upload
 
@@ -38,7 +45,7 @@ from .stock_receipts import create_tire_stock_receipt
 
 
 class StockReceiptCreateAPIView(APIView):
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated, CanCreateStockReceipt]
 
     def post(self, request, *args, **kwargs):
         serializer = StockReceiptCreateSerializer(data=request.data)
@@ -55,10 +62,12 @@ class StockReceiptCreateAPIView(APIView):
 
 
 class InventoryItemListAPIView(APIView):
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated, CanViewInventory]
 
     def get(self, request, *args, **kwargs):
         include_zero_stock = str(request.query_params.get("include_zero_stock", "false")).lower() == "true"
+        if include_zero_stock and not CanViewZeroStock().has_permission(request, self):
+            return Response({"detail": "You do not have permission to view zero stock."}, status=status.HTTP_403_FORBIDDEN)
         grouped = get_inventory_cards_grouped_by_rim(include_zero_stock=include_zero_stock)
         response_data = {
             rim: InventoryCardSerializer(cards, many=True).data
@@ -68,12 +77,14 @@ class InventoryItemListAPIView(APIView):
 
 
 class InventoryItemDetailAPIView(RetrieveAPIView):
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated, CanViewInventory]
     queryset = InventoryItem.objects.select_related(
         "catalog_item",
         "catalog_item__brand",
         "catalog_item__brand__logo_image",
         "catalog_item__tire_spec",
+        "catalog_item__rim_spec",
+        "catalog_item__rim_spec__photo_image",
         "owner",
     )
     lookup_url_kwarg = "inventory_item_id"
@@ -87,7 +98,7 @@ class InventoryItemDetailAPIView(RetrieveAPIView):
 
 
 class InventoryItemRestockAPIView(APIView):
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated, CanRestock]
 
     def post(self, request, inventory_item_id, *args, **kwargs):
         serializer = RestockSerializer(data=request.data)
@@ -115,7 +126,7 @@ class InventoryItemRestockAPIView(APIView):
 
 
 class RimReceiptCreateAPIView(APIView):
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated, CanCreateStockReceipt]
     parser_classes = [JSONParser, MultiPartParser, FormParser]
 
     def post(self, request, *args, **kwargs):
@@ -145,7 +156,7 @@ class RimReceiptCreateAPIView(APIView):
 
 
 class RimInventoryListAPIView(APIView):
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated, CanViewInventory]
 
     def get(self, request, *args, **kwargs):
         grouped = get_rim_inventory_cards_grouped()
@@ -157,7 +168,7 @@ class RimInventoryListAPIView(APIView):
 
 
 class RimInventoryDeactivateAPIView(APIView):
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated, CanDeactivateRims]
 
     def post(self, request, inventory_item_id, *args, **kwargs):
         serializer = RimDeactivateSerializer(data=request.data)

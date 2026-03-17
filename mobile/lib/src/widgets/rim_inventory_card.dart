@@ -92,15 +92,17 @@ class RimInventoryCard extends StatelessWidget {
                       item.owner?.name ?? '-',
                       style: theme.textTheme.bodyMedium,
                     ),
-                    const SizedBox(height: 12),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: FilledButton.icon(
-                        onPressed: onAdd,
-                        icon: const Icon(Icons.add_shopping_cart_outlined),
-                        label: const Text('Agregar'),
+                    if (onAdd != null) ...[
+                      const SizedBox(height: 12),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: FilledButton.icon(
+                          onPressed: onAdd,
+                          icon: const Icon(Icons.add_shopping_cart_outlined),
+                          label: const Text('Agregar'),
+                        ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
               ),
