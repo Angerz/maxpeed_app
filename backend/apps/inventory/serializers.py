@@ -19,6 +19,9 @@ from apps.images.serializers import ImageRefSerializer
 from apps.inventory.models import Owner
 
 
+DATETIME_DISPLAY_FORMAT = "%d/%m/%Y %H:%M:%S"
+
+
 class StockReceiptCreateSerializer(serializers.Serializer):
     tire_type = serializers.ChoiceField(choices=TireType.choices)
     brand_id = serializers.PrimaryKeyRelatedField(
@@ -122,9 +125,9 @@ class InventoryDetailSerializer(serializers.Serializer):
     details = serializers.CharField()
     purchase_price = serializers.DecimalField(max_digits=12, decimal_places=2, allow_null=True)
     suggested_sale_price = serializers.DecimalField(max_digits=12, decimal_places=2, allow_null=True)
-    last_restock_at = serializers.DateTimeField(allow_null=True)
-    created_at = serializers.DateTimeField(allow_null=True)
-    updated_at = serializers.DateTimeField(allow_null=True)
+    last_restock_at = serializers.DateTimeField(allow_null=True, format=DATETIME_DISPLAY_FORMAT)
+    created_at = serializers.DateTimeField(allow_null=True, format=DATETIME_DISPLAY_FORMAT)
+    updated_at = serializers.DateTimeField(allow_null=True, format=DATETIME_DISPLAY_FORMAT)
     image = ImageRefSerializer(allow_null=True)
     image_thumb = ImageRefSerializer(allow_null=True)
 

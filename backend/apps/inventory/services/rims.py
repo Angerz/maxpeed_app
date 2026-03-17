@@ -11,6 +11,14 @@ from apps.inventory.services.core import set_current_price
 from apps.purchases.models import StockReceipt, StockReceiptLine
 
 
+RIM_SPANISH_LABELS = {
+    "material": {
+        "ALUMINUM": "Aluminio",
+        "IRON": "Fierro",
+    },
+}
+
+
 class RimSpecConflictError(Exception):
     pass
 
@@ -54,6 +62,12 @@ def _resolve_brand_images(brand):
     full = brand.logo_image_full or brand.logo_image
     thumb = brand.logo_image_thumb or full
     return full, thumb
+
+
+def _spanish_material(value):
+    if not value:
+        return value
+    return RIM_SPANISH_LABELS["material"].get(value, value)
 
 
 @transaction.atomic
@@ -208,7 +222,7 @@ def get_rim_inventory_cards_grouped():
     for inventory_item in queryset:
         rim_spec = inventory_item.catalog_item.rim_spec
         rim = rim_spec.rim_diameter
-        set_label = "SET" if rim_spec.is_set else "SINGLE"
+        set_label = "Juego" if rim_spec.is_set else "Suelto"
         rim_full = rim_spec.photo_image_full or rim_spec.photo_image
         rim_thumb = rim_spec.photo_image_thumb or rim_full
         if rim_full is None:
@@ -219,7 +233,12 @@ def get_rim_inventory_cards_grouped():
                 "internal_code": inventory_item.catalog_item.code,
                 "brand": inventory_item.catalog_item.brand.name if inventory_item.catalog_item.brand else None,
                 "stock": inventory_item.stock,
-                "details": f"{rim_spec.material} | {rim_spec.holes}H | {rim_spec.width_in}IN | {set_label}",
+                "details": (
+                    f"{_spanish_material(rim_spec.material)} | "
+                    f"{rim_spec.holes} huecos | "
+                    f"{rim_spec.width_in} pulgadas | "
+                    f"{set_label}"
+                ),
                 "owner": {"id": inventory_item.owner.id, "name": inventory_item.owner.name},
                 "image": _build_image_ref(rim_full),
                 "image_thumb": _build_image_ref(rim_thumb),

@@ -4,6 +4,71 @@ from apps.catalog.choices import ProductCategory
 from apps.inventory.models import InventoryItem, PriceRecord, PriceType
 
 
+SPANISH_LABELS = {
+    "tire_type": {
+        "RADIAL": "Radial",
+        "CARGO": "Carga",
+        "MILLIMETRIC": "Milimétrica",
+        "CONVENTIONAL": "Convencional",
+    },
+    "origin": {
+        "CHINA": "China",
+        "THAILAND": "Tailandesa",
+        "JAPAN": "Japonesa",
+        "KOREA": "Coreana",
+        "AMERICAN": "Americana",
+        "INDIA": "India",
+        "MEXICAN": "Mexicana",
+        "EUROPE": "Europea",
+        "PERUVIAN": "Peruana",
+        "OTHER": "Otra",
+    },
+    "tread_type": {
+        "LINEAR": "Lineal",
+        "AT": "AT",
+        "AT2": "AT2",
+        "AT3": "AT3",
+        "HT": "HT",
+        "MT": "MT",
+        "RT": "RT",
+        "LT": "LT",
+        "HIGHWAY": "Pistera",
+        "SPORT": "Deportiva",
+        "MIXED": "Mixta",
+    },
+    "letter_color": {
+        "BLACK": "NEGRA",
+        "WHITE": "BLANCA",
+        "RED": "ROJA",
+        "YELLOW": "AMARILLA",
+    },
+    "rim_material": {
+        "ALUMINUM": "Aluminio",
+        "IRON": "Fierro",
+    },
+}
+
+
+def _spanish_label(group, value):
+    if not value:
+        return value
+    return SPANISH_LABELS.get(group, {}).get(value, value)
+
+
+def _spanish_ply_rating(value):
+    if not value:
+        return value
+    if value.startswith("PR") and value[2:].isdigit():
+        return f"{value[2:]}PR"
+    return value
+
+
+def _spanish_letter_color(value):
+    if not value:
+        return value
+    return f"LETRA {_spanish_label('letter_color', value)}"
+
+
 def _rim_sort_key(rim_value):
     if not rim_value:
         return 999
@@ -80,9 +145,9 @@ def get_inventory_cards_grouped_by_rim(*, include_zero_stock=False):
         details = " | ".join(
             part
             for part in [
-                inventory_item.catalog_item.origin,
-                tire_spec.ply_rating if tire_spec else None,
-                tire_spec.tread_type if tire_spec else None,
+                _spanish_label("origin", inventory_item.catalog_item.origin),
+                _spanish_ply_rating(tire_spec.ply_rating if tire_spec else None),
+                _spanish_label("tread_type", tire_spec.tread_type if tire_spec else None),
             ]
             if part
         )
@@ -110,15 +175,25 @@ def get_inventory_item_detail_payload(inventory_item):
     tire_spec = getattr(catalog_item, "tire_spec", None)
     rim_spec = getattr(catalog_item, "rim_spec", None)
 
-    detail_parts = [
-        catalog_item.origin,
-        tire_spec.ply_rating if tire_spec else None,
-        tire_spec.tread_type if tire_spec else None,
-    ]
-    if catalog_item.model:
-        detail_parts.append(catalog_item.model)
-    detail_parts.append(tire_spec.letter_color if tire_spec else None)
-    details = " | ".join(str(part) for part in detail_parts if part)
+    if catalog_item.product_category == ProductCategory.RIM and rim_spec:
+        details = " | ".join(
+            [
+                _spanish_label("rim_material", rim_spec.material),
+                f"{rim_spec.holes} huecos",
+                f"{rim_spec.width_in} pulgadas",
+                "Juego" if rim_spec.is_set else "Suelto",
+            ]
+        )
+    else:
+        detail_parts = [
+            _spanish_label("origin", catalog_item.origin),
+            _spanish_ply_rating(tire_spec.ply_rating if tire_spec else None),
+            _spanish_label("tread_type", tire_spec.tread_type if tire_spec else None),
+        ]
+        if catalog_item.model:
+            detail_parts.append(catalog_item.model)
+        detail_parts.append(_spanish_letter_color(tire_spec.letter_color if tire_spec else None))
+        details = " | ".join(str(part) for part in detail_parts if part)
 
     # For stock > 0 we require current price, for stock = 0 we fallback to last historical.
     fallback_last = inventory_item.stock == 0
@@ -140,7 +215,7 @@ def get_inventory_item_detail_payload(inventory_item):
     return {
         "inventory_item_id": inventory_item.id,
         "code": catalog_item.code,
-        "tire_type": tire_spec.tire_type if tire_spec else None,
+        "tire_type": _spanish_label("tire_type", tire_spec.tire_type) if tire_spec else None,
         "brand": catalog_item.brand.name if catalog_item.brand else None,
         "stock": inventory_item.stock,
         "owner": {"id": inventory_item.owner.id, "name": inventory_item.owner.name},
