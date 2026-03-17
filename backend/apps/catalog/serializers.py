@@ -1,5 +1,7 @@
 from rest_framework import serializers
 
+from apps.images.serializers import ImageRefSerializer
+
 from .choices import (
     LetterColor,
     Origin,
@@ -147,3 +149,8 @@ class BrandSerializer(serializers.ModelSerializer):
 class CatalogServiceSerializer(serializers.Serializer):
     value = serializers.CharField()
     label = serializers.CharField()
+
+
+class BrandLogoUploadResponseSerializer(serializers.Serializer):
+    brand_id = serializers.IntegerField()
+    logo_image = ImageRefSerializer(allow_null=True)

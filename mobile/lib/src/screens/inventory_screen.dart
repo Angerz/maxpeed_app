@@ -1,4 +1,3 @@
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 
 import '../models/inventory_card_item.dart';
@@ -10,7 +9,6 @@ import '../panels/add_to_cart_sheet.dart';
 import '../panels/inventory_detail_sheet.dart';
 import '../panels/rim_detail_sheet.dart';
 import '../services/catalog_api_service.dart';
-import '../services/rim_photo_storage.dart';
 import '../store/cart_store.dart';
 import '../widgets/rim_inventory_card.dart';
 import '../widgets/tire_inventory_card.dart';
@@ -29,9 +27,7 @@ class InventoryScreen extends StatefulWidget {
 class _InventoryScreenState extends State<InventoryScreen> {
   final _searchController = TextEditingController();
   final _apiService = CatalogApiService();
-  final _rimPhotoStorage = createRimPhotoStorage();
   final Map<int, double?> _tireSuggestedPriceCache = <int, double?>{};
-  final Map<String, Uint8List?> _rimPhotoCache = <String, Uint8List?>{};
 
   InventoryViewMode _mode = InventoryViewMode.tires;
   bool _includeZeroStock = false;
@@ -124,10 +120,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
       if (!mounted) {
         return;
       }
-      await _warmRimPhotoCache(response);
-      if (!mounted) {
-        return;
-      }
       setState(() {
         _rimsInventory = response;
       });
@@ -150,10 +142,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
   Future<void> _refreshRims() async {
     try {
       final response = await _apiService.fetchRimsInventory();
-      if (!mounted) {
-        return;
-      }
-      await _warmRimPhotoCache(response);
       if (!mounted) {
         return;
       }
@@ -333,27 +321,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
       _tireSuggestedPriceCache[inventoryItemId] = null;
       return null;
     }
-  }
-
-  Future<void> _warmRimPhotoCache(RimGroupedResponse response) async {
-    if (!_rimPhotoStorage.supportsPersistentStorage) {
-      return;
-    }
-    final codes = response.groups.values
-        .expand((items) => items)
-        .map((item) => sanitizeRimCode(item.internalCode))
-        .where((code) => code.isNotEmpty)
-        .toSet();
-    if (codes.isEmpty) {
-      return;
-    }
-
-    await Future.wait(
-      codes.map((code) async {
-        final bytes = await _rimPhotoStorage.readPhotoBytes(code);
-        _rimPhotoCache[code] = bytes;
-      }),
-    );
   }
 
   Widget _buildHeaderControls() {
@@ -587,7 +554,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
           ...items.map(
             (item) => RimInventoryCard(
               item: item,
-              photoBytes: _rimPhotoCache[sanitizeRimCode(item.internalCode)],
               onTap: () => _openRimPreview(item),
               onAdd: () => _addRimToCart(item),
             ),

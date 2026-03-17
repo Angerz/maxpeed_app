@@ -1,8 +1,14 @@
+import os
+
 from rest_framework import status
 from rest_framework.generics import RetrieveAPIView
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
+
+from apps.images.models import ImageKind
+from apps.images.services import create_image_asset_from_upload
 
 from .services import get_inventory_cards_grouped_by_rim, get_inventory_item_detail_payload
 from .services.rims import (
@@ -66,6 +72,7 @@ class InventoryItemDetailAPIView(RetrieveAPIView):
     queryset = InventoryItem.objects.select_related(
         "catalog_item",
         "catalog_item__brand",
+        "catalog_item__brand__logo_image",
         "catalog_item__tire_spec",
         "owner",
     )
@@ -109,15 +116,25 @@ class InventoryItemRestockAPIView(APIView):
 
 class RimReceiptCreateAPIView(APIView):
     permission_classes = [AllowAny]
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
 
     def post(self, request, *args, **kwargs):
         serializer = RimReceiptCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
+        payload = dict(serializer.validated_data)
+        rim_photo = payload.pop("rim_photo", None)
+        if rim_photo is not None:
+            payload["photo_image"] = create_image_asset_from_upload(
+                uploaded_file=rim_photo,
+                kind=ImageKind.RIM_PHOTO,
+                max_size_bytes=int(os.getenv("MAX_IMAGE_SIZE_BYTES", 5 * 1024 * 1024)),
+            )
+
         user = request.user if getattr(request.user, "is_authenticated", False) else None
         try:
             payload = create_rim_stock_receipt(
-                payload=serializer.validated_data,
+                payload=payload,
                 user=user,
             )
         except RimSpecConflictError as exc:

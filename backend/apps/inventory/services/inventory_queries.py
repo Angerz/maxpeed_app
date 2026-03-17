@@ -13,6 +13,12 @@ def _rim_sort_key(rim_value):
         return 999
 
 
+def _build_image_ref(image):
+    if image is None:
+        return None
+    return {"id": image.id, "url": f"/api/images/{image.id}/"}
+
+
 def get_effective_price(inventory_item, price_type, fallback_last=True):
     current = (
         PriceRecord.objects.filter(
@@ -46,6 +52,7 @@ def get_inventory_cards_grouped_by_rim(*, include_zero_stock=False):
         .select_related(
             "catalog_item",
             "catalog_item__brand",
+            "catalog_item__brand__logo_image",
             "catalog_item__tire_spec",
             "owner",
         )
@@ -76,6 +83,11 @@ def get_inventory_cards_grouped_by_rim(*, include_zero_stock=False):
                 "stock": inventory_item.stock,
                 "details": details,
                 "owner": {"id": inventory_item.owner.id, "name": inventory_item.owner.name},
+                "image": _build_image_ref(
+                    inventory_item.catalog_item.brand.logo_image
+                    if inventory_item.catalog_item.brand
+                    else None
+                ),
             }
         )
 
@@ -121,4 +133,5 @@ def get_inventory_item_detail_payload(inventory_item):
         "last_restock_at": inventory_item.last_restock_at,
         "created_at": inventory_item.created_at,
         "updated_at": inventory_item.updated_at,
+        "image": _build_image_ref(catalog_item.brand.logo_image if catalog_item.brand else None),
     }

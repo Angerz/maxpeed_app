@@ -1,3 +1,4 @@
+import os
 from decimal import Decimal, ROUND_HALF_UP
 
 from rest_framework import serializers
@@ -14,6 +15,7 @@ from apps.catalog.choices import (
     TreadType,
 )
 from apps.catalog.models import Brand, TireSpec
+from apps.images.serializers import ImageRefSerializer
 from apps.inventory.models import Owner
 
 
@@ -106,6 +108,7 @@ class InventoryCardSerializer(serializers.Serializer):
     stock = serializers.IntegerField()
     details = serializers.CharField()
     owner = InventoryOwnerSerializer()
+    image = ImageRefSerializer(allow_null=True)
 
 
 class InventoryDetailSerializer(serializers.Serializer):
@@ -121,6 +124,7 @@ class InventoryDetailSerializer(serializers.Serializer):
     last_restock_at = serializers.DateTimeField(allow_null=True)
     created_at = serializers.DateTimeField(allow_null=True)
     updated_at = serializers.DateTimeField(allow_null=True)
+    image = ImageRefSerializer(allow_null=True)
 
 
 class RestockSerializer(serializers.Serializer):
@@ -186,6 +190,19 @@ class RimReceiptCreateSerializer(serializers.Serializer):
         allow_null=True,
     )
     notes = serializers.CharField(required=False, allow_blank=True, allow_null=True, max_length=1000)
+    rim_photo = serializers.FileField(required=False, allow_null=True)
+
+    def validate_rim_photo(self, value):
+        if value is None:
+            return None
+        allowed_mimes = {"image/jpeg", "image/jpg", "image/png", "image/webp"}
+        content_type = (value.content_type or "").lower()
+        if content_type not in allowed_mimes:
+            raise serializers.ValidationError("Unsupported image type. Use jpg/jpeg, png, or webp.")
+        max_size = int(os.getenv("MAX_IMAGE_SIZE_BYTES", 5 * 1024 * 1024))
+        if value.size > max_size:
+            raise serializers.ValidationError(f"Image too large. Max {max_size} bytes.")
+        return value
 
     def validate_internal_code(self, value):
         value = value.strip()
@@ -224,6 +241,7 @@ class RimInventoryCardSerializer(serializers.Serializer):
     stock = serializers.IntegerField()
     details = serializers.CharField()
     owner = InventoryOwnerSerializer()
+    image = ImageRefSerializer(allow_null=True)
 
 
 class RimDeactivateSerializer(serializers.Serializer):

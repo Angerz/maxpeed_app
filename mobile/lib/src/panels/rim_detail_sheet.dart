@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../models/inventory_detail.dart';
 import '../models/rim_inventory_card_item.dart';
 import '../services/catalog_api_service.dart';
 
@@ -18,17 +19,34 @@ class RimDetailSheet extends StatefulWidget {
 }
 
 class _RimDetailSheetState extends State<RimDetailSheet> {
+  late Future<InventoryDetail> _future;
   bool _isDeactivating = false;
   String? _error;
 
-  bool get _canDeactivate => widget.item.owner?.name.trim().toUpperCase() == 'ALDO';
+  bool get _canDeactivate =>
+      widget.item.owner?.name.trim().toUpperCase() == 'ALDO';
+
+  String get _logoAsset {
+    final normalized = widget.item.brand.toLowerCase().replaceAll(' ', '_');
+    return 'assets/brands/$normalized.png';
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _future = widget.apiService.fetchInventoryDetail(
+      widget.item.inventoryItemId,
+    );
+  }
 
   Future<void> _deactivate() async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Confirmar'),
-        content: const Text('¿Desactivar este aro? Ya no se mostrará en inventario.'),
+        content: const Text(
+          '¿Desactivar este aro? Ya no se mostrará en inventario.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
@@ -60,9 +78,9 @@ class _RimDetailSheetState extends State<RimDetailSheet> {
         return;
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Aro desactivado')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Aro desactivado')));
       Navigator.of(context).pop(true);
     } catch (error) {
       if (!mounted) {
@@ -76,7 +94,9 @@ class _RimDetailSheetState extends State<RimDetailSheet> {
       setState(() {
         _error = message;
       });
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
     } finally {
       if (mounted) {
         setState(() {
@@ -86,23 +106,74 @@ class _RimDetailSheetState extends State<RimDetailSheet> {
     }
   }
 
-  Widget _buildRow(String label, String value) {
+  String _formatDate(String raw) {
+    if (raw.trim().isEmpty) {
+      return '-';
+    }
+    final parsed = DateTime.tryParse(raw);
+    if (parsed == null) {
+      return raw;
+    }
+    final local = parsed.toLocal();
+    final yy = local.year.toString().padLeft(4, '0');
+    final mm = local.month.toString().padLeft(2, '0');
+    final dd = local.day.toString().padLeft(2, '0');
+    final hh = local.hour.toString().padLeft(2, '0');
+    final min = local.minute.toString().padLeft(2, '0');
+    return '$yy-$mm-$dd $hh:$min';
+  }
+
+  Widget _row(String label, String value) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Column(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            label,
-            style: Theme.of(context).textTheme.labelLarge,
+          SizedBox(
+            width: 140,
+            child: Text(
+              '$label:',
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
           ),
-          const SizedBox(height: 2),
-          Text(
-            value,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-          ),
+          Expanded(child: Text(value.isEmpty ? '-' : value)),
         ],
       ),
+    );
+  }
+
+  String _fallback(String value, String fallback) {
+    final trimmed = value.trim();
+    return trimmed.isEmpty ? fallback : trimmed;
+  }
+
+  Widget _buildImagePreview(String imageUrl) {
+    return Container(
+      height: 180,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: imageUrl.isNotEmpty
+          ? Image.network(
+              imageUrl,
+              fit: BoxFit.contain,
+              filterQuality: FilterQuality.high,
+              errorBuilder: (context, error, stackTrace) => Image.asset(
+                _logoAsset,
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) =>
+                    const Icon(Icons.album_outlined, size: 80),
+              ),
+            )
+          : Image.asset(
+              _logoAsset,
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) =>
+                  const Icon(Icons.album_outlined, size: 80),
+            ),
     );
   }
 
@@ -110,47 +181,130 @@ class _RimDetailSheetState extends State<RimDetailSheet> {
   Widget build(BuildContext context) {
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildRow('Código interno', widget.item.internalCode),
-              _buildRow('Marca', widget.item.brand),
-              _buildRow('Stock', '${widget.item.stock}'),
-              _buildRow('Detalles', widget.item.details),
-              _buildRow('Dueño', widget.item.owner?.name ?? '-'),
-              if (_error != null) ...[
-                const SizedBox(height: 8),
-                Text(
-                  _error!,
-                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+        child: FutureBuilder<InventoryDetail>(
+          future: _future,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const SizedBox(
+                height: 280,
+                child: Center(child: CircularProgressIndicator()),
+              );
+            }
+
+            if (snapshot.hasError) {
+              return SizedBox(
+                height: 320,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      'No se pudo cargar el detalle del aro.\n${snapshot.error}',
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                    FilledButton(
+                      onPressed: () {
+                        setState(() {
+                          _future = widget.apiService.fetchInventoryDetail(
+                            widget.item.inventoryItemId,
+                          );
+                        });
+                      },
+                      child: const Text('Reintentar'),
+                    ),
+                  ],
                 ),
-              ],
-              const SizedBox(height: 12),
-              if (_canDeactivate)
-                ElevatedButton.icon(
-                  onPressed: _isDeactivating ? null : _deactivate,
-                  icon: _isDeactivating
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.block),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Theme.of(context).colorScheme.errorContainer,
-                    foregroundColor: Theme.of(context).colorScheme.onErrorContainer,
+              );
+            }
+
+            final detail = snapshot.data;
+            if (detail == null) {
+              return const SizedBox(
+                height: 220,
+                child: Center(child: Text('Sin detalle.')),
+              );
+            }
+
+            return SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildImagePreview(
+                    detail.image?.url.trim().isNotEmpty == true
+                        ? detail.image!.url
+                        : (widget.item.image?.url ?? ''),
                   ),
-                  label: Text(_isDeactivating ? 'Desactivando...' : 'Desactivar'),
-                ),
-              TextButton(
-                onPressed: _isDeactivating ? null : () => Navigator.of(context).pop(false),
-                child: const Text('Cerrar'),
+                  const SizedBox(height: 14),
+                  Text(
+                    _fallback(detail.code, widget.item.internalCode),
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  _row(
+                    'Código',
+                    _fallback(detail.code, widget.item.internalCode),
+                  ),
+                  _row('Tipo', detail.tireType),
+                  _row('Marca', _fallback(detail.brand, widget.item.brand)),
+                  _row('Stock', '${detail.stock}'),
+                  _row(
+                    'Dueño',
+                    detail.owner?.name ?? widget.item.owner?.name ?? '-',
+                  ),
+                  _row(
+                    'Detalles',
+                    _fallback(detail.details, widget.item.details),
+                  ),
+                  _row('Precio compra', detail.purchasePrice),
+                  _row('Precio sugerido', detail.suggestedSalePrice),
+                  _row('Último restock', _formatDate(detail.lastRestockAt)),
+                  _row('Creado', _formatDate(detail.createdAt)),
+                  _row('Actualizado', _formatDate(detail.updatedAt)),
+                  if (_error != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      _error!,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 12),
+                  if (_canDeactivate)
+                    ElevatedButton.icon(
+                      onPressed: _isDeactivating ? null : _deactivate,
+                      icon: _isDeactivating
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.block),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Theme.of(
+                          context,
+                        ).colorScheme.errorContainer,
+                        foregroundColor: Theme.of(
+                          context,
+                        ).colorScheme.onErrorContainer,
+                      ),
+                      label: Text(
+                        _isDeactivating ? 'Desactivando...' : 'Desactivar',
+                      ),
+                    ),
+                  TextButton(
+                    onPressed: _isDeactivating
+                        ? null
+                        : () => Navigator.of(context).pop(false),
+                    child: const Text('Cerrar'),
+                  ),
+                ],
               ),
-            ],
-          ),
+            );
+          },
         ),
       ),
     );

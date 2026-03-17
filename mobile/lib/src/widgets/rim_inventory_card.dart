@@ -1,4 +1,3 @@
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 
 import '../models/rim_inventory_card_item.dart';
@@ -7,13 +6,11 @@ class RimInventoryCard extends StatelessWidget {
   const RimInventoryCard({
     super.key,
     required this.item,
-    this.photoBytes,
     this.onTap,
     this.onAdd,
   });
 
   final RimInventoryCardItem item;
-  final Uint8List? photoBytes;
   final VoidCallback? onTap;
   final VoidCallback? onAdd;
 
@@ -43,19 +40,19 @@ class RimInventoryCard extends StatelessWidget {
                     alignment: Alignment.centerRight,
                     child: FractionallySizedBox(
                       widthFactor: 0.85,
-                      child: photoBytes != null
-                          ? Image.memory(
-                              photoBytes!,
-                              fit: BoxFit.cover,
+                      child: item.image != null && item.image!.hasUrl
+                          ? Image.network(
+                              item.image!.url,
+                              fit: BoxFit.contain,
                               alignment: Alignment.centerRight,
-                              errorBuilder: (_, __, ___) =>
+                              errorBuilder: (context, error, stackTrace) =>
                                   _BrandPlaceholder(brand: item.brand),
                             )
                           : Image.asset(
                               _logoAsset,
                               fit: BoxFit.contain,
                               alignment: Alignment.centerRight,
-                              errorBuilder: (_, __, ___) =>
+                              errorBuilder: (context, error, stackTrace) =>
                                   _BrandPlaceholder(brand: item.brand),
                             ),
                     ),

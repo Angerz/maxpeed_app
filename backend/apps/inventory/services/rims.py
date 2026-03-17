@@ -42,6 +42,12 @@ def _rim_sort_key(rim_value):
         return 999
 
 
+def _build_image_ref(image):
+    if image is None:
+        return None
+    return {"id": image.id, "url": f"/api/images/{image.id}/"}
+
+
 @transaction.atomic
 def create_rim_stock_receipt(*, payload, user=None):
     now = timezone.now()
@@ -84,6 +90,9 @@ def create_rim_stock_receipt(*, payload, user=None):
             raise RimSpecConflictError(
                 "internal_code already exists with different rim specs."
             )
+        if payload.get("photo_image") is not None:
+            rim_spec.photo_image = payload["photo_image"]
+            rim_spec.save(update_fields=["photo_image"])
         catalog_item = existing_catalog
     else:
         catalog_item = CatalogItem.objects.create(
@@ -106,6 +115,7 @@ def create_rim_stock_receipt(*, payload, user=None):
             width_in=payload["width_in"],
             material=payload["material"],
             is_set=payload["is_set"],
+            photo_image=payload.get("photo_image"),
         )
         created_new_catalog_item = True
 
@@ -170,7 +180,9 @@ def get_rim_inventory_cards_grouped():
         .select_related(
             "catalog_item",
             "catalog_item__brand",
+            "catalog_item__brand__logo_image",
             "catalog_item__rim_spec",
+            "catalog_item__rim_spec__photo_image",
             "owner",
         )
         .order_by("catalog_item__rim_spec__rim_diameter", "catalog_item__code", "id")
@@ -181,6 +193,11 @@ def get_rim_inventory_cards_grouped():
         rim_spec = inventory_item.catalog_item.rim_spec
         rim = rim_spec.rim_diameter
         set_label = "SET" if rim_spec.is_set else "SINGLE"
+        resolved_image = rim_spec.photo_image or (
+            inventory_item.catalog_item.brand.logo_image
+            if inventory_item.catalog_item.brand
+            else None
+        )
         grouped_cards.setdefault(rim, []).append(
             {
                 "inventory_item_id": inventory_item.id,
@@ -189,6 +206,7 @@ def get_rim_inventory_cards_grouped():
                 "stock": inventory_item.stock,
                 "details": f"{rim_spec.material} | {rim_spec.holes}H | {rim_spec.width_in}IN | {set_label}",
                 "owner": {"id": inventory_item.owner.id, "name": inventory_item.owner.name},
+                "image": _build_image_ref(resolved_image),
             }
         )
 

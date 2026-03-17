@@ -8,7 +8,6 @@ import '../models/catalog_choices.dart';
 import '../models/owner.dart';
 import '../models/rim_receipt_request.dart';
 import '../services/catalog_api_service.dart';
-import '../services/rim_photo_storage.dart';
 import '../widgets/brand_autocomplete_field.dart';
 
 enum EntryMode { tire, rim }
@@ -347,7 +346,7 @@ class _TireEntryFormState extends State<_TireEntryForm> {
     required ValueChanged<CatalogChoiceOption?> onChanged,
   }) {
     return DropdownButtonFormField<CatalogChoiceOption>(
-      value: value,
+      initialValue: value,
       decoration: InputDecoration(labelText: '$label *'),
       items: items
           .map(
@@ -379,7 +378,7 @@ class _TireEntryFormState extends State<_TireEntryForm> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             DropdownButtonFormField<Owner>(
-              value: _selectedOwner,
+              initialValue: _selectedOwner,
               decoration: const InputDecoration(labelText: 'Dueño *'),
               items: choices.owners
                   .map(
@@ -564,7 +563,6 @@ class _RimEntryForm extends StatefulWidget {
 class _RimEntryFormState extends State<_RimEntryForm> {
   final _formKey = GlobalKey<FormState>();
   final _imagePicker = ImagePicker();
-  final _photoStorage = createRimPhotoStorage();
   final _internalCodeController = TextEditingController();
   final _quantityController = TextEditingController();
   final _priceController = TextEditingController();
@@ -722,16 +720,11 @@ class _RimEntryFormState extends State<_RimEntryForm> {
         notes: _notesController.text.trim().isEmpty
             ? null
             : _notesController.text.trim(),
+        rimPhotoBytes: _selectedPhotoBytes,
+        rimPhotoFilename: _selectedPhoto?.name,
       );
 
       await widget.apiService.postRimReceipt(request);
-      if (_selectedPhotoBytes != null &&
-          _photoStorage.supportsPersistentStorage) {
-        await _photoStorage.savePhotoBytes(
-          internalCode: internalCode,
-          bytes: _selectedPhotoBytes!,
-        );
-      }
 
       if (!mounted) {
         return;
@@ -853,7 +846,7 @@ class _RimEntryFormState extends State<_RimEntryForm> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             DropdownButtonFormField<Owner>(
-              value: _selectedOwner,
+              initialValue: _selectedOwner,
               decoration: const InputDecoration(labelText: 'Dueño *'),
               items: widget.choices.owners
                   .map(
@@ -868,7 +861,7 @@ class _RimEntryFormState extends State<_RimEntryForm> {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<BrandOption>(
-              value: _selectedBrand,
+              initialValue: _selectedBrand,
               decoration: const InputDecoration(labelText: 'Marca *'),
               items: _rimBrands
                   .map(
@@ -903,17 +896,11 @@ class _RimEntryFormState extends State<_RimEntryForm> {
                       ),
                     ),
                     const SizedBox(height: 10),
-                    if (!_photoStorage.supportsPersistentStorage)
-                      const Text(
-                        'Guardado local disponible solo en dispositivo móvil.',
-                      ),
                     Row(
                       children: [
                         Expanded(
                           child: OutlinedButton.icon(
-                            onPressed:
-                                !_photoStorage.supportsPersistentStorage ||
-                                    _isSubmitting
+                            onPressed: _isSubmitting
                                 ? null
                                 : () => _pickPhoto(ImageSource.camera),
                             icon: const Icon(Icons.camera_alt_outlined),
@@ -923,9 +910,7 @@ class _RimEntryFormState extends State<_RimEntryForm> {
                         const SizedBox(width: 10),
                         Expanded(
                           child: OutlinedButton.icon(
-                            onPressed:
-                                !_photoStorage.supportsPersistentStorage ||
-                                    _isSubmitting
+                            onPressed: _isSubmitting
                                 ? null
                                 : () => _pickPhoto(ImageSource.gallery),
                             icon: const Icon(Icons.photo_library_outlined),
@@ -974,7 +959,7 @@ class _RimEntryFormState extends State<_RimEntryForm> {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<CatalogChoiceOption>(
-              value: _selectedDiameter,
+              initialValue: _selectedDiameter,
               decoration: const InputDecoration(labelText: 'Diámetro *'),
               items: widget.choices.rimDiameters
                   .map(
@@ -990,7 +975,7 @@ class _RimEntryFormState extends State<_RimEntryForm> {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<CatalogChoiceOption>(
-              value: _selectedHoles,
+              initialValue: _selectedHoles,
               decoration: const InputDecoration(
                 labelText: 'Número de huecos *',
               ),
@@ -1008,7 +993,7 @@ class _RimEntryFormState extends State<_RimEntryForm> {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<CatalogChoiceOption>(
-              value: _selectedWidth,
+              initialValue: _selectedWidth,
               decoration: const InputDecoration(labelText: 'Ancho *'),
               items: widget.choices.rimWidthsIn
                   .map(
@@ -1023,7 +1008,7 @@ class _RimEntryFormState extends State<_RimEntryForm> {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<CatalogChoiceOption>(
-              value: _selectedMaterial,
+              initialValue: _selectedMaterial,
               decoration: const InputDecoration(labelText: 'Material *'),
               items: widget.choices.rimMaterials
                   .map(

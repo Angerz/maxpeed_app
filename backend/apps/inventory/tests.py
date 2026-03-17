@@ -2,6 +2,7 @@ from decimal import Decimal
 
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -16,6 +17,7 @@ from apps.inventory.models import (
     PriceRecord,
     PriceType,
 )
+from apps.images.models import ImageAsset, ImageKind
 from apps.purchases.models import StockReceipt, StockReceiptLine
 from apps.inventory.services.core import set_current_price
 
@@ -534,3 +536,169 @@ class RimDeactivateApiTests(APITestCase):
         after = self.client.get(list_url)
         self.assertEqual(after.status_code, status.HTTP_200_OK)
         self.assertNotIn("R15", after.data)
+
+
+class InventoryImageApiTests(APITestCase):
+    def setUp(self):
+        self.owner, _ = Owner.objects.get_or_create(name="Maxpeed")
+        self.brand = Brand.objects.create(name="MICHELIN")
+        self.rim_brand = Brand.objects.create(name="ROMAX")
+
+        tire_catalog = CatalogItem.objects.create(
+            sku="TIRE-MICHELIN-195-65-R15-PRIMACY5",
+            code="195/65R15",
+            item_kind=ItemKind.MERCHANDISE,
+            product_category=ProductCategory.TIRE,
+            brand=self.brand,
+            model="PRIMACY 5",
+            origin=Origin.CHINA,
+        )
+        TireSpec.objects.create(
+            catalog_item=tire_catalog,
+            tire_type=TireType.RADIAL,
+            width=195,
+            aspect_ratio=65,
+            rim_diameter="R15",
+            ply_rating="PR8",
+            tread_type="LINEAR",
+            letter_color="BLACK",
+        )
+        self.tire_inventory = InventoryItem.objects.create(
+            catalog_item=tire_catalog,
+            owner=self.owner,
+            condition=InventoryCondition.NEW,
+            stock=3,
+        )
+
+    def _fake_png(self, name="img.png", body=b"abc123"):
+        return SimpleUploadedFile(name, b"\x89PNG\r\n\x1a\n" + body, content_type="image/png")
+
+    def test_image_download_returns_binary_bytes_with_content_type(self):
+        image = ImageAsset.objects.create(
+            kind=ImageKind.BRAND_LOGO,
+            mime_type="image/png",
+            data=b"\x89PNG\r\n\x1a\nDATA",
+            sha256="x" * 64,
+            size_bytes=12,
+        )
+
+        response = self.client.get(reverse("image-asset-download", kwargs={"image_id": image.id}))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response["Content-Type"], "image/png")
+        self.assertEqual(response.content, b"\x89PNG\r\n\x1a\nDATA")
+
+    def test_upload_brand_logo_then_tire_list_returns_image_url(self):
+        upload_url = reverse("catalog-brand-logo-upload", kwargs={"brand_id": self.brand.id})
+        response = self.client.post(upload_url, {"logo": self._fake_png()}, format="multipart")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertIsNotNone(response.data["logo_image"]["id"])
+
+        list_response = self.client.get(reverse("inventory-items"))
+        self.assertEqual(list_response.status_code, status.HTTP_200_OK)
+        card = list_response.data["R15"][0]
+        self.assertEqual(card["inventory_item_id"], self.tire_inventory.id)
+        self.assertTrue(card["image"]["url"].startswith("/api/images/"))
+
+    def test_rim_receipt_with_photo_uses_rim_photo_priority(self):
+        receipt_url = reverse("inventory-rim-receipts")
+        payload = {
+            "owner_id": str(self.owner.id),
+            "brand_id": str(self.rim_brand.id),
+            "internal_code": "RIM-PHOTO-001",
+            "rim_diameter": "R15",
+            "holes": "5",
+            "width_in": "8",
+            "material": "ALUMINUM",
+            "is_set": "true",
+            "quantity": "1",
+            "unit_purchase_price": "500.00",
+            "suggested_sale_price": "650.00",
+            "rim_photo": self._fake_png(name="rim1.png", body=b"photo1"),
+        }
+        response = self.client.post(receipt_url, payload, format="multipart")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        catalog_item = CatalogItem.objects.get(id=response.data["catalog_item_id"])
+        self.assertIsNotNone(catalog_item.rim_spec.photo_image_id)
+
+        list_response = self.client.get(reverse("inventory-rims"))
+        self.assertEqual(list_response.status_code, status.HTTP_200_OK)
+        card = list_response.data["R15"][0]
+        self.assertEqual(card["image"]["id"], catalog_item.rim_spec.photo_image_id)
+
+    def test_rims_list_falls_back_to_brand_logo_when_no_rim_photo(self):
+        upload_url = reverse("catalog-brand-logo-upload", kwargs={"brand_id": self.rim_brand.id})
+        logo_response = self.client.post(upload_url, {"logo": self._fake_png(name="logo.png", body=b"logo")}, format="multipart")
+        self.assertEqual(logo_response.status_code, status.HTTP_201_CREATED)
+        logo_id = logo_response.data["logo_image"]["id"]
+
+        receipt_response = self.client.post(
+            reverse("inventory-rim-receipts"),
+            {
+                "owner_id": self.owner.id,
+                "brand_id": self.rim_brand.id,
+                "internal_code": "RIM-NOPHOTO-001",
+                "rim_diameter": "R16",
+                "holes": 5,
+                "width_in": 8,
+                "material": "ALUMINUM",
+                "is_set": True,
+                "quantity": 1,
+                "unit_purchase_price": "400.00",
+                "suggested_sale_price": "520.00",
+            },
+            format="json",
+        )
+        self.assertEqual(receipt_response.status_code, status.HTTP_201_CREATED)
+
+        list_response = self.client.get(reverse("inventory-rims"))
+        self.assertEqual(list_response.status_code, status.HTTP_200_OK)
+        card = list_response.data["R16"][0]
+        self.assertEqual(card["image"]["id"], logo_id)
+
+    def test_rim_photo_is_replaced_on_existing_internal_code(self):
+        receipt_url = reverse("inventory-rim-receipts")
+        first = self.client.post(
+            receipt_url,
+            {
+                "owner_id": str(self.owner.id),
+                "brand_id": str(self.rim_brand.id),
+                "internal_code": "RIM-REPLACE-001",
+                "rim_diameter": "R15",
+                "holes": "5",
+                "width_in": "8",
+                "material": "ALUMINUM",
+                "is_set": "true",
+                "quantity": "1",
+                "unit_purchase_price": "450.00",
+                "suggested_sale_price": "585.00",
+                "rim_photo": self._fake_png(name="old.png", body=b"old"),
+            },
+            format="multipart",
+        )
+        self.assertEqual(first.status_code, status.HTTP_201_CREATED)
+        catalog_item = CatalogItem.objects.get(id=first.data["catalog_item_id"])
+        first_photo_id = catalog_item.rim_spec.photo_image_id
+
+        second = self.client.post(
+            receipt_url,
+            {
+                "owner_id": str(self.owner.id),
+                "brand_id": str(self.rim_brand.id),
+                "internal_code": "RIM-REPLACE-001",
+                "rim_diameter": "R15",
+                "holes": "5",
+                "width_in": "8",
+                "material": "ALUMINUM",
+                "is_set": "true",
+                "quantity": "1",
+                "unit_purchase_price": "450.00",
+                "suggested_sale_price": "585.00",
+                "rim_photo": self._fake_png(name="new.png", body=b"new"),
+            },
+            format="multipart",
+        )
+        self.assertEqual(second.status_code, status.HTTP_201_CREATED)
+        catalog_item.refresh_from_db()
+        self.assertNotEqual(catalog_item.rim_spec.photo_image_id, first_photo_id)

@@ -40,14 +40,23 @@ class TireInventoryCard extends StatelessWidget {
                     alignment: Alignment.centerRight,
                     child: FractionallySizedBox(
                       widthFactor: 0.85,
-                      child: Image.asset(
-                        _logoAsset,
-                        fit: BoxFit.contain,
-                        alignment: Alignment.centerRight,
-                        errorBuilder: (_, __, ___) {
-                          return _BrandPlaceholder(brand: item.brand);
-                        },
-                      ),
+                      child: item.image != null && item.image!.hasUrl
+                          ? Image.network(
+                              item.image!.url,
+                              fit: BoxFit.contain,
+                              alignment: Alignment.centerRight,
+                              errorBuilder: (context, error, stackTrace) {
+                                return _BrandPlaceholder(brand: item.brand);
+                              },
+                            )
+                          : Image.asset(
+                              _logoAsset,
+                              fit: BoxFit.contain,
+                              alignment: Alignment.centerRight,
+                              errorBuilder: (context, error, stackTrace) {
+                                return _BrandPlaceholder(brand: item.brand);
+                              },
+                            ),
                     ),
                   ),
                 ),

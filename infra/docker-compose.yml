@@ -12,7 +12,9 @@ services:
       POSTGRES_USER: ${POSTGRES_USER?err}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD?err}
     volumes:
-      - maxpeed_db_data:/var/lib/postgresql/data
+      # Postgres 18 stores PGDATA under /var/lib/postgresql/<major>/docker by default.
+      # Mount the parent directory to keep data persistent across container recreation.
+      - maxpeed_db_data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s

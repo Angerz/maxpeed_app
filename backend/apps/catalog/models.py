@@ -25,6 +25,13 @@ class ActiveCatalogQuerySet(models.QuerySet):
 
 class Brand(models.Model):
     name = models.CharField(max_length=120, unique=True, db_index=True)
+    logo_image = models.ForeignKey(
+        "images.ImageAsset",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="brand_logos",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -215,6 +222,13 @@ class RimSpec(models.Model):
     width_in = models.PositiveSmallIntegerField(choices=RimWidthIn.choices)
     material = models.CharField(max_length=16, choices=RimMaterial.choices)
     is_set = models.BooleanField(default=False)
+    photo_image = models.ForeignKey(
+        "images.ImageAsset",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="rim_photos",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

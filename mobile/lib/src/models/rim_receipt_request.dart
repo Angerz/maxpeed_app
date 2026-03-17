@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 class RimReceiptRequest {
   const RimReceiptRequest({
     required this.ownerId,
@@ -12,6 +14,8 @@ class RimReceiptRequest {
     required this.unitPurchasePrice,
     this.suggestedSalePrice,
     this.notes,
+    this.rimPhotoBytes,
+    this.rimPhotoFilename,
   });
 
   final int ownerId;
@@ -26,6 +30,8 @@ class RimReceiptRequest {
   final String unitPurchasePrice;
   final String? suggestedSalePrice;
   final String? notes;
+  final Uint8List? rimPhotoBytes;
+  final String? rimPhotoFilename;
 
   Map<String, dynamic> toJson() {
     return {
@@ -42,5 +48,27 @@ class RimReceiptRequest {
       'suggested_sale_price': suggestedSalePrice,
       'notes': notes,
     };
+  }
+
+  Map<String, String> toFields() {
+    final fields = <String, String>{
+      'owner_id': ownerId.toString(),
+      'brand_id': brandId.toString(),
+      'internal_code': internalCode,
+      'rim_diameter': rimDiameter,
+      'holes': holes.toString(),
+      'width_in': widthIn.toString(),
+      'material': material,
+      'is_set': isSet.toString(),
+      'quantity': quantity.toString(),
+      'unit_purchase_price': unitPurchasePrice,
+    };
+    if (suggestedSalePrice != null && suggestedSalePrice!.trim().isNotEmpty) {
+      fields['suggested_sale_price'] = suggestedSalePrice!.trim();
+    }
+    if (notes != null && notes!.trim().isNotEmpty) {
+      fields['notes'] = notes!.trim();
+    }
+    return fields;
   }
 }
