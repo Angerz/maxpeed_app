@@ -109,6 +109,7 @@ class InventoryCardSerializer(serializers.Serializer):
     details = serializers.CharField()
     owner = InventoryOwnerSerializer()
     image = ImageRefSerializer(allow_null=True)
+    image_thumb = ImageRefSerializer(allow_null=True)
 
 
 class InventoryDetailSerializer(serializers.Serializer):
@@ -125,6 +126,7 @@ class InventoryDetailSerializer(serializers.Serializer):
     created_at = serializers.DateTimeField(allow_null=True)
     updated_at = serializers.DateTimeField(allow_null=True)
     image = ImageRefSerializer(allow_null=True)
+    image_thumb = ImageRefSerializer(allow_null=True)
 
 
 class RestockSerializer(serializers.Serializer):
@@ -242,6 +244,7 @@ class RimInventoryCardSerializer(serializers.Serializer):
     details = serializers.CharField()
     owner = InventoryOwnerSerializer()
     image = ImageRefSerializer(allow_null=True)
+    image_thumb = ImageRefSerializer(allow_null=True)
 
 
 class RimDeactivateSerializer(serializers.Serializer):

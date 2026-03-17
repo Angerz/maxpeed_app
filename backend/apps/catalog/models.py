@@ -25,12 +25,27 @@ class ActiveCatalogQuerySet(models.QuerySet):
 
 class Brand(models.Model):
     name = models.CharField(max_length=120, unique=True, db_index=True)
+    # Legacy field kept temporarily for backward compatibility/migration.
     logo_image = models.ForeignKey(
         "images.ImageAsset",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name="brand_logos",
+    )
+    logo_image_full = models.ForeignKey(
+        "images.ImageAsset",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="brand_logo_full_set",
+    )
+    logo_image_thumb = models.ForeignKey(
+        "images.ImageAsset",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="brand_logo_thumb_set",
     )
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -222,12 +237,27 @@ class RimSpec(models.Model):
     width_in = models.PositiveSmallIntegerField(choices=RimWidthIn.choices)
     material = models.CharField(max_length=16, choices=RimMaterial.choices)
     is_set = models.BooleanField(default=False)
+    # Legacy field kept temporarily for backward compatibility/migration.
     photo_image = models.ForeignKey(
         "images.ImageAsset",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name="rim_photos",
+    )
+    photo_image_full = models.ForeignKey(
+        "images.ImageAsset",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="rim_photo_full_set",
+    )
+    photo_image_thumb = models.ForeignKey(
+        "images.ImageAsset",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="rim_photo_thumb_set",
     )
     created_at = models.DateTimeField(auto_now_add=True)
 

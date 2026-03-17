@@ -66,6 +66,42 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
     );
   }
 
+  String _detailImageUrl(InventoryDetail detail) {
+    final full = detail.image?.url.trim() ?? '';
+    if (full.isNotEmpty) {
+      return full;
+    }
+    return detail.imageThumb?.url.trim() ?? '';
+  }
+
+  Widget _buildImagePreview(InventoryDetail detail) {
+    final imageUrl = _detailImageUrl(detail);
+    return Container(
+      height: 180,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: imageUrl.isNotEmpty
+          ? Image.network(
+              imageUrl,
+              fit: BoxFit.contain,
+              filterQuality: FilterQuality.high,
+              loadingBuilder: (context, child, loadingProgress) {
+                if (loadingProgress == null) {
+                  return child;
+                }
+                return const Center(child: CircularProgressIndicator());
+              },
+              errorBuilder: (context, error, stackTrace) =>
+                  const Icon(Icons.image_not_supported_outlined, size: 72),
+            )
+          : const Icon(Icons.image_outlined, size: 72),
+    );
+  }
+
   Future<void> _openRestock(InventoryDetail detail) async {
     final success = await showModalBottomSheet<bool>(
       context: context,
@@ -148,6 +184,8 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  _buildImagePreview(detail),
+                  const SizedBox(height: 14),
                   Text(
                     detail.code,
                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(

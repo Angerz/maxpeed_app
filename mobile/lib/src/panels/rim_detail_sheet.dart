@@ -29,11 +29,6 @@ class _RimDetailSheetState extends State<RimDetailSheet> {
       widget.canDeactivateRims &&
       widget.item.owner?.name.trim().toUpperCase() == 'ALDO';
 
-  String get _logoAsset {
-    final normalized = widget.item.brand.toLowerCase().replaceAll(' ', '_');
-    return 'assets/brands/$normalized.png';
-  }
-
   @override
   void initState() {
     super.initState();
@@ -150,6 +145,25 @@ class _RimDetailSheetState extends State<RimDetailSheet> {
     return trimmed.isEmpty ? fallback : trimmed;
   }
 
+  String _detailImageUrl(InventoryDetail detail) {
+    final full = detail.image?.url.trim() ?? '';
+    if (full.isNotEmpty) {
+      return full;
+    }
+
+    final thumbFromDetail = detail.imageThumb?.url.trim() ?? '';
+    if (thumbFromDetail.isNotEmpty) {
+      return thumbFromDetail;
+    }
+
+    final thumbFromCard = widget.item.imageThumb?.url.trim() ?? '';
+    if (thumbFromCard.isNotEmpty) {
+      return thumbFromCard;
+    }
+
+    return widget.item.image?.url.trim() ?? '';
+  }
+
   Widget _buildImagePreview(String imageUrl) {
     return Container(
       height: 180,
@@ -164,19 +178,16 @@ class _RimDetailSheetState extends State<RimDetailSheet> {
               imageUrl,
               fit: BoxFit.contain,
               filterQuality: FilterQuality.high,
-              errorBuilder: (context, error, stackTrace) => Image.asset(
-                _logoAsset,
-                fit: BoxFit.contain,
-                errorBuilder: (context, error, stackTrace) =>
-                    const Icon(Icons.album_outlined, size: 80),
-              ),
-            )
-          : Image.asset(
-              _logoAsset,
-              fit: BoxFit.contain,
+              loadingBuilder: (context, child, loadingProgress) {
+                if (loadingProgress == null) {
+                  return child;
+                }
+                return const Center(child: CircularProgressIndicator());
+              },
               errorBuilder: (context, error, stackTrace) =>
                   const Icon(Icons.album_outlined, size: 80),
-            ),
+            )
+          : const Icon(Icons.album_outlined, size: 80),
     );
   }
 
@@ -233,11 +244,7 @@ class _RimDetailSheetState extends State<RimDetailSheet> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildImagePreview(
-                    detail.image?.url.trim().isNotEmpty == true
-                        ? detail.image!.url
-                        : (widget.item.image?.url ?? ''),
-                  ),
+                  _buildImagePreview(_detailImageUrl(detail)),
                   const SizedBox(height: 14),
                   Text(
                     _fallback(detail.code, widget.item.internalCode),

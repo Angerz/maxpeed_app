@@ -15,7 +15,7 @@ from apps.accounts.permissions import (
 )
 from apps.accounts.permissions import CanViewZeroStock
 from apps.images.models import ImageKind
-from apps.images.services import create_image_asset_from_upload
+from apps.images.services import create_image_variants_from_upload
 
 from .services import get_inventory_cards_grouped_by_rim, get_inventory_item_detail_payload
 from .services.rims import (
@@ -82,9 +82,13 @@ class InventoryItemDetailAPIView(RetrieveAPIView):
         "catalog_item",
         "catalog_item__brand",
         "catalog_item__brand__logo_image",
+        "catalog_item__brand__logo_image_full",
+        "catalog_item__brand__logo_image_thumb",
         "catalog_item__tire_spec",
         "catalog_item__rim_spec",
         "catalog_item__rim_spec__photo_image",
+        "catalog_item__rim_spec__photo_image_full",
+        "catalog_item__rim_spec__photo_image_thumb",
         "owner",
     )
     lookup_url_kwarg = "inventory_item_id"
@@ -136,11 +140,13 @@ class RimReceiptCreateAPIView(APIView):
         payload = dict(serializer.validated_data)
         rim_photo = payload.pop("rim_photo", None)
         if rim_photo is not None:
-            payload["photo_image"] = create_image_asset_from_upload(
+            full, thumb = create_image_variants_from_upload(
                 uploaded_file=rim_photo,
                 kind=ImageKind.RIM_PHOTO,
                 max_size_bytes=int(os.getenv("MAX_IMAGE_SIZE_BYTES", 5 * 1024 * 1024)),
             )
+            payload["photo_image_full"] = full
+            payload["photo_image_thumb"] = thumb
 
         user = request.user if getattr(request.user, "is_authenticated", False) else None
         try:

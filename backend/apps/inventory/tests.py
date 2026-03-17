@@ -635,6 +635,7 @@ class InventoryImageApiTests(APITestCase):
         card = list_response.data["R15"][0]
         self.assertEqual(card["inventory_item_id"], self.tire_inventory.id)
         self.assertTrue(card["image"]["url"].startswith("/api/images/"))
+        self.assertTrue(card["image_thumb"]["url"].startswith("/api/images/"))
 
     def test_rim_receipt_with_photo_uses_rim_photo_priority(self):
         receipt_url = reverse("inventory-rim-receipts")
@@ -662,6 +663,7 @@ class InventoryImageApiTests(APITestCase):
         self.assertEqual(list_response.status_code, status.HTTP_200_OK)
         card = list_response.data["R15"][0]
         self.assertEqual(card["image"]["id"], catalog_item.rim_spec.photo_image_id)
+        self.assertIsNotNone(card["image_thumb"])
 
     def test_rims_list_falls_back_to_brand_logo_when_no_rim_photo(self):
         upload_url = reverse("catalog-brand-logo-upload", kwargs={"brand_id": self.rim_brand.id})
@@ -692,6 +694,7 @@ class InventoryImageApiTests(APITestCase):
         self.assertEqual(list_response.status_code, status.HTTP_200_OK)
         card = list_response.data["R16"][0]
         self.assertEqual(card["image"]["id"], logo_id)
+        self.assertEqual(card["image_thumb"]["id"], logo_id)
 
     def test_rim_photo_is_replaced_on_existing_internal_code(self):
         receipt_url = reverse("inventory-rim-receipts")
@@ -772,6 +775,7 @@ class InventoryImageApiTests(APITestCase):
         self.assertEqual(detail_with_photo.status_code, status.HTTP_200_OK)
         photo_id = CatalogItem.objects.get(id=create_response.data["catalog_item_id"]).rim_spec.photo_image_id
         self.assertEqual(detail_with_photo.data["image"]["id"], photo_id)
+        self.assertIsNotNone(detail_with_photo.data["image_thumb"])
 
         update_response = self.client.post(
             receipt_url,
@@ -798,3 +802,4 @@ class InventoryImageApiTests(APITestCase):
         detail_fallback = self.client.get(detail_url)
         self.assertEqual(detail_fallback.status_code, status.HTTP_200_OK)
         self.assertEqual(detail_fallback.data["image"]["id"], logo_id)
+        self.assertEqual(detail_fallback.data["image_thumb"]["id"], logo_id)

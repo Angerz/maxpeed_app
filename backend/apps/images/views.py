@@ -1,3 +1,5 @@
+import hashlib
+
 from django.http import Http404, HttpResponse
 from rest_framework.permissions import AllowAny
 from rest_framework.views import APIView
@@ -14,7 +16,6 @@ class ImageAssetRetrieveAPIView(APIView):
             raise Http404("Image not found.")
 
         response = HttpResponse(image.data, content_type=image.mime_type)
-        if image.sha256:
-            response["ETag"] = image.sha256
+        response["ETag"] = image.sha256 or hashlib.sha256(image.data).hexdigest()
         response["Cache-Control"] = "public, max-age=86400"
         return response

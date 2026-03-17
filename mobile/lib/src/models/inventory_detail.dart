@@ -15,6 +15,7 @@ class InventoryDetail {
     required this.lastRestockAt,
     required this.createdAt,
     required this.updatedAt,
+    required this.imageThumb,
     required this.image,
   });
 
@@ -30,10 +31,12 @@ class InventoryDetail {
   final String lastRestockAt;
   final String createdAt;
   final String updatedAt;
+  final ImageRef? imageThumb;
   final ImageRef? image;
 
   factory InventoryDetail.fromJson(Map<String, dynamic> json) {
     final ownerRaw = json['owner'];
+    final imageThumbRaw = json['image_thumb'];
     final imageRaw = json['image'];
     return InventoryDetail(
       inventoryItemId: (json['inventory_item_id'] as num?)?.toInt() ?? 0,
@@ -48,6 +51,9 @@ class InventoryDetail {
       lastRestockAt: (json['last_restock_at'] ?? '').toString(),
       createdAt: (json['created_at'] ?? '').toString(),
       updatedAt: (json['updated_at'] ?? '').toString(),
+      imageThumb: imageThumbRaw is Map<String, dynamic>
+          ? ImageRef.fromJson(imageThumbRaw)
+          : null,
       image: imageRaw is Map<String, dynamic>
           ? ImageRef.fromJson(imageRaw)
           : null,

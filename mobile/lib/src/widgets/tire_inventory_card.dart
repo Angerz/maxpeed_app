@@ -14,9 +14,12 @@ class TireInventoryCard extends StatelessWidget {
   final VoidCallback? onTap;
   final VoidCallback? onAdd;
 
-  String get _logoAsset {
-    final normalized = item.brand.toLowerCase().replaceAll(' ', '');
-    return 'assets/brands/$normalized.png';
+  String get _thumbUrl {
+    final thumb = item.imageThumb?.url.trim() ?? '';
+    if (thumb.isNotEmpty) {
+      return thumb;
+    }
+    return item.image?.url.trim() ?? '';
   }
 
   @override
@@ -40,23 +43,17 @@ class TireInventoryCard extends StatelessWidget {
                     alignment: Alignment.centerRight,
                     child: FractionallySizedBox(
                       widthFactor: 0.85,
-                      child: item.image != null && item.image!.hasUrl
+                      child: _thumbUrl.isNotEmpty
                           ? Image.network(
-                              item.image!.url,
+                              _thumbUrl,
                               fit: BoxFit.contain,
                               alignment: Alignment.centerRight,
+                              cacheWidth: 600,
                               errorBuilder: (context, error, stackTrace) {
                                 return _BrandPlaceholder(brand: item.brand);
                               },
                             )
-                          : Image.asset(
-                              _logoAsset,
-                              fit: BoxFit.contain,
-                              alignment: Alignment.centerRight,
-                              errorBuilder: (context, error, stackTrace) {
-                                return _BrandPlaceholder(brand: item.brand);
-                              },
-                            ),
+                          : _BrandPlaceholder(brand: item.brand),
                     ),
                   ),
                 ),

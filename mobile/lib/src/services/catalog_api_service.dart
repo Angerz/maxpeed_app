@@ -435,16 +435,22 @@ class CatalogApiService {
 
   Map<String, dynamic> _normalizeImageUrlsInItem(Map<String, dynamic> item) {
     final out = Map<String, dynamic>.from(item);
-    final imageRaw = out['image'];
-    if (imageRaw is Map<String, dynamic>) {
-      final urlRaw = (imageRaw['url'] ?? '').toString();
-      out['image'] = {...imageRaw, 'url': buildAbsoluteUrl(urlRaw)};
-    } else if (imageRaw is Map) {
-      final casted = imageRaw.cast<String, dynamic>();
-      final urlRaw = (casted['url'] ?? '').toString();
-      out['image'] = {...casted, 'url': buildAbsoluteUrl(urlRaw)};
-    }
+    out['image'] = _normalizeImageRef(out['image']);
+    out['image_thumb'] = _normalizeImageRef(out['image_thumb']);
     return out;
+  }
+
+  Map<String, dynamic>? _normalizeImageRef(dynamic raw) {
+    if (raw is Map<String, dynamic>) {
+      final urlRaw = (raw['url'] ?? '').toString();
+      return {...raw, 'url': buildAbsoluteUrl(urlRaw)};
+    }
+    if (raw is Map) {
+      final casted = raw.cast<String, dynamic>();
+      final urlRaw = (casted['url'] ?? '').toString();
+      return {...casted, 'url': buildAbsoluteUrl(urlRaw)};
+    }
+    return null;
   }
 
   Future<void> deactivateRim(int inventoryItemId, {String? reason}) async {

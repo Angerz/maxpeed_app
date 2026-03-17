@@ -9,6 +9,7 @@ class RimInventoryCardItem {
     required this.stock,
     required this.details,
     required this.owner,
+    required this.imageThumb,
     required this.image,
   });
 
@@ -18,10 +19,12 @@ class RimInventoryCardItem {
   final int stock;
   final String details;
   final Owner? owner;
+  final ImageRef? imageThumb;
   final ImageRef? image;
 
   factory RimInventoryCardItem.fromJson(Map<String, dynamic> json) {
     final ownerRaw = json['owner'];
+    final imageThumbRaw = json['image_thumb'];
     final imageRaw = json['image'];
     return RimInventoryCardItem(
       inventoryItemId: (json['inventory_item_id'] as num?)?.toInt() ?? 0,
@@ -30,6 +33,9 @@ class RimInventoryCardItem {
       stock: (json['stock'] as num?)?.toInt() ?? 0,
       details: (json['details'] ?? '').toString(),
       owner: ownerRaw is Map<String, dynamic> ? Owner.fromJson(ownerRaw) : null,
+      imageThumb: imageThumbRaw is Map<String, dynamic>
+          ? ImageRef.fromJson(imageThumbRaw)
+          : null,
       image: imageRaw is Map<String, dynamic>
           ? ImageRef.fromJson(imageRaw)
           : null,

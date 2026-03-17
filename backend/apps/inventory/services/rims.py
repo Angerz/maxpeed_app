@@ -48,6 +48,14 @@ def _build_image_ref(image):
     return {"id": image.id, "url": f"/api/images/{image.id}/"}
 
 
+def _resolve_brand_images(brand):
+    if not brand:
+        return None, None
+    full = brand.logo_image_full or brand.logo_image
+    thumb = brand.logo_image_thumb or full
+    return full, thumb
+
+
 @transaction.atomic
 def create_rim_stock_receipt(*, payload, user=None):
     now = timezone.now()
@@ -90,9 +98,11 @@ def create_rim_stock_receipt(*, payload, user=None):
             raise RimSpecConflictError(
                 "internal_code already exists with different rim specs."
             )
-        if payload.get("photo_image") is not None:
-            rim_spec.photo_image = payload["photo_image"]
-            rim_spec.save(update_fields=["photo_image"])
+        if payload.get("photo_image_full") is not None:
+            rim_spec.photo_image_full = payload["photo_image_full"]
+            rim_spec.photo_image_thumb = payload.get("photo_image_thumb")
+            rim_spec.photo_image = payload["photo_image_full"]
+            rim_spec.save(update_fields=["photo_image_full", "photo_image_thumb", "photo_image"])
         catalog_item = existing_catalog
     else:
         catalog_item = CatalogItem.objects.create(
@@ -115,7 +125,9 @@ def create_rim_stock_receipt(*, payload, user=None):
             width_in=payload["width_in"],
             material=payload["material"],
             is_set=payload["is_set"],
-            photo_image=payload.get("photo_image"),
+            photo_image=payload.get("photo_image_full"),
+            photo_image_full=payload.get("photo_image_full"),
+            photo_image_thumb=payload.get("photo_image_thumb"),
         )
         created_new_catalog_item = True
 
@@ -181,8 +193,12 @@ def get_rim_inventory_cards_grouped():
             "catalog_item",
             "catalog_item__brand",
             "catalog_item__brand__logo_image",
+            "catalog_item__brand__logo_image_full",
+            "catalog_item__brand__logo_image_thumb",
             "catalog_item__rim_spec",
             "catalog_item__rim_spec__photo_image",
+            "catalog_item__rim_spec__photo_image_full",
+            "catalog_item__rim_spec__photo_image_thumb",
             "owner",
         )
         .order_by("catalog_item__rim_spec__rim_diameter", "catalog_item__code", "id")
@@ -193,11 +209,10 @@ def get_rim_inventory_cards_grouped():
         rim_spec = inventory_item.catalog_item.rim_spec
         rim = rim_spec.rim_diameter
         set_label = "SET" if rim_spec.is_set else "SINGLE"
-        resolved_image = rim_spec.photo_image or (
-            inventory_item.catalog_item.brand.logo_image
-            if inventory_item.catalog_item.brand
-            else None
-        )
+        rim_full = rim_spec.photo_image_full or rim_spec.photo_image
+        rim_thumb = rim_spec.photo_image_thumb or rim_full
+        if rim_full is None:
+            rim_full, rim_thumb = _resolve_brand_images(inventory_item.catalog_item.brand)
         grouped_cards.setdefault(rim, []).append(
             {
                 "inventory_item_id": inventory_item.id,
@@ -206,7 +221,8 @@ def get_rim_inventory_cards_grouped():
                 "stock": inventory_item.stock,
                 "details": f"{rim_spec.material} | {rim_spec.holes}H | {rim_spec.width_in}IN | {set_label}",
                 "owner": {"id": inventory_item.owner.id, "name": inventory_item.owner.name},
-                "image": _build_image_ref(resolved_image),
+                "image": _build_image_ref(rim_full),
+                "image_thumb": _build_image_ref(rim_thumb),
             }
         )
 

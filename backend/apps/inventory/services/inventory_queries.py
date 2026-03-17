@@ -19,6 +19,14 @@ def _build_image_ref(image):
     return {"id": image.id, "url": f"/api/images/{image.id}/"}
 
 
+def _resolve_brand_images(brand):
+    if not brand:
+        return None, None
+    full = brand.logo_image_full or brand.logo_image
+    thumb = brand.logo_image_thumb or full
+    return full, thumb
+
+
 def get_effective_price(inventory_item, price_type, fallback_last=True):
     current = (
         PriceRecord.objects.filter(
@@ -53,6 +61,8 @@ def get_inventory_cards_grouped_by_rim(*, include_zero_stock=False):
             "catalog_item",
             "catalog_item__brand",
             "catalog_item__brand__logo_image",
+            "catalog_item__brand__logo_image_full",
+            "catalog_item__brand__logo_image_thumb",
             "catalog_item__tire_spec",
             "owner",
         )
@@ -65,6 +75,7 @@ def get_inventory_cards_grouped_by_rim(*, include_zero_stock=False):
     grouped_cards = {}
     for inventory_item in queryset:
         tire_spec = getattr(inventory_item.catalog_item, "tire_spec", None)
+        brand_full, brand_thumb = _resolve_brand_images(inventory_item.catalog_item.brand)
         rim = tire_spec.rim_diameter if tire_spec else "UNKNOWN"
         details = " | ".join(
             part
@@ -83,11 +94,8 @@ def get_inventory_cards_grouped_by_rim(*, include_zero_stock=False):
                 "stock": inventory_item.stock,
                 "details": details,
                 "owner": {"id": inventory_item.owner.id, "name": inventory_item.owner.name},
-                "image": _build_image_ref(
-                    inventory_item.catalog_item.brand.logo_image
-                    if inventory_item.catalog_item.brand
-                    else None
-                ),
+                "image": _build_image_ref(brand_full),
+                "image_thumb": _build_image_ref(brand_thumb),
             }
         )
 
@@ -122,11 +130,12 @@ def get_inventory_item_detail_payload(inventory_item):
     )
 
     if catalog_item.product_category == ProductCategory.RIM:
-        resolved_image = rim_spec.photo_image if rim_spec else None
-        if resolved_image is None and catalog_item.brand:
-            resolved_image = catalog_item.brand.logo_image
+        full = (rim_spec.photo_image_full if rim_spec else None) or (rim_spec.photo_image if rim_spec else None)
+        thumb = (rim_spec.photo_image_thumb if rim_spec else None) or full
+        if full is None:
+            full, thumb = _resolve_brand_images(catalog_item.brand)
     else:
-        resolved_image = catalog_item.brand.logo_image if catalog_item.brand else None
+        full, thumb = _resolve_brand_images(catalog_item.brand)
 
     return {
         "inventory_item_id": inventory_item.id,
@@ -141,5 +150,6 @@ def get_inventory_item_detail_payload(inventory_item):
         "last_restock_at": inventory_item.last_restock_at,
         "created_at": inventory_item.created_at,
         "updated_at": inventory_item.updated_at,
-        "image": _build_image_ref(resolved_image),
+        "image": _build_image_ref(full),
+        "image_thumb": _build_image_ref(thumb),
     }

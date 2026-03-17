@@ -9,7 +9,7 @@ admin.site.index_title = "Operacion del backend"
 
 @admin.register(Brand)
 class BrandAdmin(admin.ModelAdmin):
-    list_display = ("name", "logo_image", "created_at")
+    list_display = ("name", "logo_image_full", "logo_image_thumb", "created_at")
     search_fields = ("name",)
     ordering = ("name",)
 
@@ -58,5 +58,14 @@ class TireSpecAdmin(admin.ModelAdmin):
 
 @admin.register(RimSpec)
 class RimSpecAdmin(admin.ModelAdmin):
-    list_display = ("catalog_item", "rim_diameter", "holes", "width_in", "material", "is_set", "photo_image")
+    list_display = (
+        "catalog_item",
+        "rim_diameter",
+        "holes",
+        "width_in",
+        "material",
+        "is_set",
+        "photo_image_full",
+        "photo_image_thumb",
+    )
     list_filter = ("rim_diameter", "holes", "width_in", "material", "is_set")
