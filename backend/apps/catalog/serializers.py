@@ -70,7 +70,7 @@ SPANISH_CHOICE_LABELS = {
         "MT": "MT",
         "RT": "RT",
         "LT": "LT",
-        "HIGHWAY": "Pistera",
+        # "HIGHWAY": "Pistera",
         "SPORT": "Deportiva",
         "MIXED": "Mixta",
     },

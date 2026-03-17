@@ -110,7 +110,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = os.getenv('DJANGO_LANGUAGE_CODE', 'es-mx')
 
-TIME_ZONE = os.getenv('DJANGO_TIME_ZONE', 'America/Mexico_City')
+TIME_ZONE = os.getenv('DJANGO_TIME_ZONE', 'America/Lima')
 
 USE_I18N = _env_bool('DJANGO_USE_I18N', True)
 

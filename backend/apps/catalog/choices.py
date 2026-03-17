@@ -76,7 +76,7 @@ class TreadType(models.TextChoices):
     MT = "MT", "M/T"
     RT = "RT", "R/T"
     LT = "LT", "L/T"
-    HIGHWAY = "HIGHWAY", "Highway"
+    # HIGHWAY = "HIGHWAY", "Highway"
     SPORT = "SPORT", "Sport"
     MIXED = "MIXED", "Mixed"
 

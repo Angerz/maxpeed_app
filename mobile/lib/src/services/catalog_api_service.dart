@@ -748,7 +748,7 @@ class CatalogApiService {
       },
       'tread_type': {
         'LINEAR': 'Lineal',
-        'HIGHWAY': 'Pistera',
+        // 'HIGHWAY': 'Pistera',
         'SPORT': 'Deportiva',
         'MIXED': 'Mixta',
       },
