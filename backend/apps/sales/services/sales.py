@@ -1,3 +1,4 @@
+import os
 from decimal import Decimal, ROUND_HALF_UP
 
 from django.db.models import Q
@@ -6,6 +7,8 @@ from django.utils import timezone
 
 from apps.catalog.choices import ItemKind, Origin, ProductCategory
 from apps.catalog.models import Brand, CatalogItem, RimSpec, TireSpec, build_rim_sku, build_tire_sku
+from apps.images.models import ImageKind
+from apps.images.services import create_image_variants_from_upload
 from apps.inventory.models import InventoryCondition, InventoryItem, MovementType, Owner, PriceType
 from apps.inventory.services.core import apply_inventory_movement, set_current_price
 from apps.sales.models import Sale, SaleLine, SaleLineType, SaleStatus
@@ -199,7 +202,7 @@ def ingest_tradein_tire(*, sale_line, line_payload, user, occurred_at):
     }
 
 
-def ingest_tradein_rim(*, sale_line, line_payload, user, occurred_at):
+def ingest_tradein_rim(*, sale_line, line_payload, user, occurred_at, rim_photo_file=None):
     rim_payload = line_payload["rim"]
     if rim_payload["owner"].name.upper() not in {"MAXPEED", "RUEL"}:
         raise SaleForbiddenError("Trade-in USED inventory owner must be Maxpeed or Ruel.")
@@ -255,7 +258,7 @@ def ingest_tradein_rim(*, sale_line, line_payload, user, occurred_at):
             origin=None,
             is_active=True,
         )
-        RimSpec.objects.create(
+        rim_spec = RimSpec.objects.create(
             catalog_item=catalog_item,
             rim_diameter=rim_payload["rim_diameter"],
             holes=rim_payload["holes"],
@@ -263,6 +266,18 @@ def ingest_tradein_rim(*, sale_line, line_payload, user, occurred_at):
             material=rim_payload["material"],
             is_set=rim_payload["is_set"],
         )
+    rim_photo_saved = False
+    if rim_photo_file is not None:
+        full, thumb = create_image_variants_from_upload(
+            uploaded_file=rim_photo_file,
+            kind=ImageKind.RIM_PHOTO,
+            max_size_bytes=int(os.getenv("MAX_IMAGE_SIZE_BYTES", 5 * 1024 * 1024)),
+        )
+        rim_spec.photo_image_full = full
+        rim_spec.photo_image_thumb = thumb
+        rim_spec.photo_image = full
+        rim_spec.save(update_fields=["photo_image_full", "photo_image_thumb", "photo_image"])
+        rim_photo_saved = True
 
     inventory_item, _ = InventoryItem.objects.select_for_update().get_or_create(
         catalog_item=catalog_item,
@@ -305,11 +320,12 @@ def ingest_tradein_rim(*, sale_line, line_payload, user, occurred_at):
         "created_inventory_item_id": inventory_item.id,
         "catalog_item_id": catalog_item.id,
         "movement_id": movement.id,
+        "rim_photo_saved": rim_photo_saved,
     }
 
 
 @transaction.atomic
-def create_sale(*, payload, user=None):
+def create_sale(*, payload, user=None, tradein_rim_files=None):
     sold_at = payload.get("sold_at") or timezone.now()
     header_discount = payload.get("discount_total") or Decimal("0.00")
     notes = payload.get("notes")
@@ -343,6 +359,8 @@ def create_sale(*, payload, user=None):
     tradein_credit_total = Decimal("0.00")
     stock_updates = []
     tradein_ingress = []
+
+    tradein_rim_files = tradein_rim_files or {}
 
     for line in lines:
         line_type = line["line_type"]
@@ -471,11 +489,15 @@ def create_sale(*, payload, user=None):
                     occurred_at=sold_at,
                 )
             else:
+                rim_photo_file = None
+                if line.get("photo_field"):
+                    rim_photo_file = tradein_rim_files.get(line["photo_field"])
                 ingress_payload = ingest_tradein_rim(
                     sale_line=sale_line,
                     line_payload=line,
                     user=user,
                     occurred_at=sold_at,
+                    rim_photo_file=rim_photo_file,
                 )
         except TradeInSpecConflictError as exc:
             raise SaleConflictError(str(exc)) from exc

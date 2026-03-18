@@ -1,8 +1,10 @@
 from decimal import Decimal
 from datetime import datetime, timedelta
+import json
 from zoneinfo import ZoneInfo
 
 from django.contrib.auth import get_user_model
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework import status
@@ -138,6 +140,10 @@ class SaleApiTests(APITestCase):
         }
         payload.update(overrides)
         return payload
+
+    @staticmethod
+    def _fake_png(name="rim.png", body=b"rimphoto"):
+        return SimpleUploadedFile(name, b"\x89PNG\r\n\x1a\n" + body, content_type="image/png")
 
     def test_create_sale_with_service_only(self):
         payload = {
@@ -318,6 +324,145 @@ class SaleApiTests(APITestCase):
         }
         second = self.client.post(self.sales_url, payload_conflict, format="json")
         self.assertEqual(second.status_code, status.HTTP_409_CONFLICT)
+
+    def test_tradein_rim_multipart_with_photo_saves_rim_photo(self):
+        payload = {
+            "lines": [
+                {
+                    "line_type": SaleLineType.SERVICE,
+                    "description": "Balanceo",
+                    "quantity": 1,
+                    "unit_price": "1.00",
+                },
+                self._tradein_rim_payload(
+                    photo_field="tradein_rim_photo_0",
+                    rim={
+                        **self._tradein_rim_payload()["rim"],
+                        "internal_code": "RIM-TRD-MULTI-001",
+                    },
+                )
+            ]
+        }
+        response = self.client.post(
+            self.sales_url,
+            {
+                "payload": json.dumps(payload),
+                "tradein_rim_photo_0": self._fake_png(name="tradein0.png", body=b"photo0"),
+            },
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(response.data["tradein_ingress"][0]["rim_photo_saved"])
+
+        ingress = response.data["tradein_ingress"][0]
+        used_item = InventoryItem.objects.get(pk=ingress["created_inventory_item_id"])
+        rim_spec = used_item.catalog_item.rim_spec
+        self.assertIsNotNone(rim_spec.photo_image_full_id)
+        self.assertIsNotNone(rim_spec.photo_image_thumb_id)
+
+    def test_tradein_rim_json_without_photo_still_works(self):
+        payload = {
+            "lines": [
+                {
+                    "line_type": SaleLineType.SERVICE,
+                    "description": "Balanceo",
+                    "quantity": 1,
+                    "unit_price": "1.00",
+                },
+                self._tradein_rim_payload(),
+            ]
+        }
+        response = self.client.post(self.sales_url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertFalse(response.data["tradein_ingress"][0]["rim_photo_saved"])
+
+    def test_tradein_rim_multipart_with_missing_photo_field_returns_400(self):
+        payload = {
+            "lines": [
+                {
+                    "line_type": SaleLineType.SERVICE,
+                    "description": "Balanceo",
+                    "quantity": 1,
+                    "unit_price": "1.00",
+                },
+                self._tradein_rim_payload(
+                    photo_field="tradein_rim_photo_missing",
+                    rim={
+                        **self._tradein_rim_payload()["rim"],
+                        "internal_code": "RIM-TRD-MULTI-ERR",
+                    },
+                )
+            ]
+        }
+        response = self.client.post(
+            self.sales_url,
+            {"payload": json.dumps(payload)},
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("photo_field", response.data)
+
+    def test_tradein_rim_multipart_replaces_existing_rim_photo(self):
+        create_payload = {
+            "lines": [
+                {
+                    "line_type": SaleLineType.SERVICE,
+                    "description": "Balanceo",
+                    "quantity": 1,
+                    "unit_price": "1.00",
+                },
+                self._tradein_rim_payload(
+                    photo_field="tradein_rim_photo_1",
+                    rim={
+                        **self._tradein_rim_payload()["rim"],
+                        "internal_code": "RIM-TRD-MULTI-REP",
+                    },
+                )
+            ]
+        }
+        first = self.client.post(
+            self.sales_url,
+            {
+                "payload": json.dumps(create_payload),
+                "tradein_rim_photo_1": self._fake_png(name="old.png", body=b"old"),
+            },
+            format="multipart",
+        )
+        self.assertEqual(first.status_code, status.HTTP_201_CREATED)
+        first_item = InventoryItem.objects.get(pk=first.data["tradein_ingress"][0]["created_inventory_item_id"])
+        first_photo_id = first_item.catalog_item.rim_spec.photo_image_full_id
+
+        second_payload = {
+            "lines": [
+                {
+                    "line_type": SaleLineType.SERVICE,
+                    "description": "Balanceo",
+                    "quantity": 1,
+                    "unit_price": "1.00",
+                },
+                self._tradein_rim_payload(
+                    photo_field="tradein_rim_photo_2",
+                    rim={
+                        **self._tradein_rim_payload()["rim"],
+                        "internal_code": "RIM-TRD-MULTI-REP",
+                    },
+                )
+            ]
+        }
+        second = self.client.post(
+            self.sales_url,
+            {
+                "payload": json.dumps(second_payload),
+                "tradein_rim_photo_2": self._fake_png(name="new.png", body=b"new"),
+            },
+            format="multipart",
+        )
+        self.assertEqual(second.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(second.data["tradein_ingress"][0]["rim_photo_saved"])
+
+        second_item = InventoryItem.objects.get(pk=second.data["tradein_ingress"][0]["created_inventory_item_id"])
+        second_photo_id = second_item.catalog_item.rim_spec.photo_image_full_id
+        self.assertNotEqual(first_photo_id, second_photo_id)
 
     def test_catalog_services_endpoint_excludes_tire_rim_accessory(self):
         response = self.client.get(self.services_url)

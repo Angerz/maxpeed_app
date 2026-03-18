@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../models/cart_models.dart';
 
@@ -141,6 +142,7 @@ class CartStore extends ChangeNotifier {
     TradeInRimSpec? rimSpec,
     int? conditionPercent,
     bool? needsRepair,
+    XFile? rimPhoto,
   }) {
     if (id == null) {
       _tradeInLines.add(
@@ -155,12 +157,14 @@ class CartStore extends ChangeNotifier {
           rimSpec: rimSpec,
           conditionPercent: conditionPercent,
           needsRepair: needsRepair,
+          rimPhoto: rimPhoto,
         ),
       );
     } else {
       final index = _tradeInLines.indexWhere((line) => line.id == id);
       if (index != -1) {
-        _tradeInLines[index] = _tradeInLines[index].copyWith(
+        _tradeInLines[index] = TradeInLine(
+          id: id,
           type: type,
           quantity: quantity,
           purchasePrice: purchasePrice,
@@ -170,6 +174,7 @@ class CartStore extends ChangeNotifier {
           rimSpec: rimSpec,
           conditionPercent: conditionPercent,
           needsRepair: needsRepair,
+          rimPhoto: rimPhoto,
         );
       }
     }

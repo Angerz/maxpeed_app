@@ -1,3 +1,5 @@
+import 'package:image_picker/image_picker.dart';
+
 enum CartProductType { tire, rim }
 
 enum ManualLineType { service, accessory }
@@ -176,6 +178,7 @@ class TradeInLine {
     this.rimSpec,
     this.conditionPercent,
     this.needsRepair,
+    this.rimPhoto,
   });
 
   final int id;
@@ -188,6 +191,7 @@ class TradeInLine {
   final TradeInRimSpec? rimSpec;
   final int? conditionPercent;
   final bool? needsRepair;
+  final XFile? rimPhoto;
 
   double get assessedValue => quantity * purchasePrice;
 
@@ -220,6 +224,7 @@ class TradeInLine {
     TradeInRimSpec? rimSpec,
     int? conditionPercent,
     bool? needsRepair,
+    XFile? rimPhoto,
   }) {
     return TradeInLine(
       id: id,
@@ -232,6 +237,7 @@ class TradeInLine {
       rimSpec: rimSpec ?? this.rimSpec,
       conditionPercent: conditionPercent ?? this.conditionPercent,
       needsRepair: needsRepair ?? this.needsRepair,
+      rimPhoto: rimPhoto ?? this.rimPhoto,
     );
   }
 }

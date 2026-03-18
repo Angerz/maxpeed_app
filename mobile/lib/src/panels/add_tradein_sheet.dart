@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../models/brand_option.dart';
 import '../models/catalog_choice_option.dart';
@@ -20,6 +21,7 @@ class TradeInFormResult {
     this.rimSpec,
     this.conditionPercent,
     this.needsRepair,
+    this.rimPhoto,
   });
 
   final TradeInType type;
@@ -31,6 +33,7 @@ class TradeInFormResult {
   final TradeInRimSpec? rimSpec;
   final int? conditionPercent;
   final bool? needsRepair;
+  final XFile? rimPhoto;
 }
 
 class AddTradeInSheet extends StatefulWidget {
@@ -45,6 +48,7 @@ class AddTradeInSheet extends StatefulWidget {
 class _AddTradeInSheetState extends State<AddTradeInSheet> {
   final _apiService = CatalogApiService();
   final _formKey = GlobalKey<FormState>();
+  final _imagePicker = ImagePicker();
 
   final _tireBrandController = TextEditingController();
   final _rimInternalCodeController = TextEditingController();
@@ -65,6 +69,8 @@ class _AddTradeInSheetState extends State<AddTradeInSheet> {
   int _conditionPercent = 70;
   bool _needsRepair = false;
   bool _isSet = false;
+  XFile? _selectedRimPhoto;
+  Uint8List? _selectedRimPhotoBytes;
 
   Owner? _selectedOwner;
   BrandOption? _selectedTireBrand;
@@ -90,6 +96,10 @@ class _AddTradeInSheetState extends State<AddTradeInSheet> {
         widget.initialLine?.purchasePrice.toStringAsFixed(2) ?? '';
     _notesController.text = widget.initialLine?.notes ?? '';
     _quantityController.text = (widget.initialLine?.quantity ?? 1).toString();
+    _selectedRimPhoto = widget.initialLine?.rimPhoto;
+    if (_selectedRimPhoto != null) {
+      _loadExistingRimPhotoPreview();
+    }
     _loadData();
   }
 
@@ -377,6 +387,118 @@ class _AddTradeInSheetState extends State<AddTradeInSheet> {
     return 'Aro USED | ${_selectedRimBrand?.name ?? '-'} | ${_rimInternalCodeController.text.trim()}';
   }
 
+  Future<void> _loadExistingRimPhotoPreview() async {
+    try {
+      final bytes = await _selectedRimPhoto!.readAsBytes();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _selectedRimPhotoBytes = bytes;
+      });
+    } catch (_) {
+      // ignore preview read failure
+    }
+  }
+
+  Future<void> _pickRimPhoto(ImageSource source) async {
+    try {
+      final picked = await _imagePicker.pickImage(
+        source: source,
+        imageQuality: 85,
+      );
+      if (picked == null) {
+        return;
+      }
+      final bytes = await picked.readAsBytes();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _selectedRimPhoto = picked;
+        _selectedRimPhotoBytes = bytes;
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No se pudo seleccionar la foto')),
+      );
+    }
+  }
+
+  Widget _buildRimPhotoSection() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Foto (opcional)',
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _pickRimPhoto(ImageSource.camera),
+                    icon: const Icon(Icons.camera_alt_outlined),
+                    label: const Text('Tomar foto'),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _pickRimPhoto(ImageSource.gallery),
+                    icon: const Icon(Icons.photo_library_outlined),
+                    label: const Text('Elegir de galería'),
+                  ),
+                ),
+              ],
+            ),
+            if (_selectedRimPhotoBytes != null) ...[
+              const SizedBox(height: 10),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.memory(
+                  _selectedRimPhotoBytes!,
+                  height: 140,
+                  fit: BoxFit.cover,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _selectedRimPhoto?.name ?? 'Foto seleccionada',
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  TextButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        _selectedRimPhoto = null;
+                        _selectedRimPhotoBytes = null;
+                      });
+                    },
+                    icon: const Icon(Icons.delete_outline),
+                    label: const Text('Quitar'),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
   void _submit() {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -437,6 +559,7 @@ class _AddTradeInSheetState extends State<AddTradeInSheet> {
       rimSpec: _type == TradeInType.rim ? _buildRimSpec() : null,
       conditionPercent: _type == TradeInType.tire ? _conditionPercent : null,
       needsRepair: _type == TradeInType.rim ? _needsRepair : null,
+      rimPhoto: _type == TradeInType.rim ? _selectedRimPhoto : null,
     );
     Navigator.of(context).pop(result);
   }
@@ -770,6 +893,10 @@ class _AddTradeInSheetState extends State<AddTradeInSheet> {
                   _buildTireFields(_choices!)
                 else
                   _buildRimFields(_choices!),
+                if (_type == TradeInType.rim) ...[
+                  const SizedBox(height: 12),
+                  _buildRimPhotoSection(),
+                ],
                 const SizedBox(height: 12),
                 if (_type == TradeInType.tire) ...[
                   Text(

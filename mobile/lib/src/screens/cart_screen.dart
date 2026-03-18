@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../models/cart_models.dart';
 import '../models/sale_models.dart';
@@ -43,8 +44,9 @@ class _CartScreenState extends State<CartScreen> {
   String _money(double value) => value.toStringAsFixed(2);
   String _price(double value) => value.toStringAsFixed(2);
 
-  SaleCreateRequest _buildSaleRequest() {
+  _SaleSubmissionData _buildSaleRequest() {
     final lines = <SaleLineRequest>[];
+    final tradeInRimPhotos = <String, XFile>{};
 
     for (final product in widget.cartStore.products) {
       lines.add(
@@ -86,6 +88,7 @@ class _CartScreenState extends State<CartScreen> {
       }
     }
 
+    var photoIndex = 0;
     for (final tradeIn in widget.cartStore.tradeInLines) {
       if (tradeIn.type == TradeInType.tire) {
         lines.add(
@@ -99,6 +102,13 @@ class _CartScreenState extends State<CartScreen> {
           ),
         );
       } else {
+        String? photoField;
+        final rimPhoto = tradeIn.rimPhoto;
+        if (rimPhoto != null) {
+          photoField = 'tradein_rim_photo_$photoIndex';
+          tradeInRimPhotos[photoField] = rimPhoto;
+          photoIndex += 1;
+        }
         lines.add(
           SaleLineRequest(
             lineType: 'TRADEIN_RIM',
@@ -106,18 +116,22 @@ class _CartScreenState extends State<CartScreen> {
             assessedValue: _price(tradeIn.purchasePrice),
             rimRequiresRepair: tradeIn.needsRepair,
             notes: tradeIn.notes,
+            photoField: photoField,
             rim: tradeIn.rimSpec?.toJson(),
           ),
         );
       }
     }
 
-    return SaleCreateRequest(
-      discountTotal: _price(widget.cartStore.discountTotal),
-      notes: _saleNotesController.text.trim().isEmpty
-          ? null
-          : _saleNotesController.text.trim(),
-      lines: lines,
+    return _SaleSubmissionData(
+      request: SaleCreateRequest(
+        discountTotal: _price(widget.cartStore.discountTotal),
+        notes: _saleNotesController.text.trim().isEmpty
+            ? null
+            : _saleNotesController.text.trim(),
+        lines: lines,
+      ),
+      tradeInRimPhotos: tradeInRimPhotos,
     );
   }
 
@@ -220,6 +234,7 @@ class _CartScreenState extends State<CartScreen> {
       rimSpec: result.rimSpec,
       conditionPercent: result.conditionPercent,
       needsRepair: result.needsRepair,
+      rimPhoto: result.rimPhoto,
     );
     if (mounted) {
       ScaffoldMessenger.of(
@@ -306,6 +321,7 @@ class _CartScreenState extends State<CartScreen> {
       rimSpec: result.rimSpec,
       conditionPercent: result.conditionPercent,
       needsRepair: result.needsRepair,
+      rimPhoto: result.rimPhoto,
     );
   }
 
@@ -335,7 +351,11 @@ class _CartScreenState extends State<CartScreen> {
     });
 
     try {
-      final response = await _apiService.createSale(_buildSaleRequest());
+      final submission = _buildSaleRequest();
+      final response = await _apiService.createSale(
+        submission.request,
+        tradeInRimPhotos: submission.tradeInRimPhotos,
+      );
       if (!mounted) {
         return;
       }
@@ -563,4 +583,14 @@ class _CartScreenState extends State<CartScreen> {
             ),
     );
   }
+}
+
+class _SaleSubmissionData {
+  const _SaleSubmissionData({
+    required this.request,
+    required this.tradeInRimPhotos,
+  });
+
+  final SaleCreateRequest request;
+  final Map<String, XFile> tradeInRimPhotos;
 }

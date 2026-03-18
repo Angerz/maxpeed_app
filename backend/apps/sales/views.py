@@ -1,4 +1,5 @@
 from datetime import date, datetime, time, timedelta
+import json
 from zoneinfo import ZoneInfo
 
 from django.db.models import Count
@@ -6,12 +7,14 @@ from apps.accounts.permissions import CanCreateSale, CanViewSaleDetail, CanViewS
 from django.utils import timezone
 from rest_framework import generics, status
 from rest_framework.exceptions import APIException, PermissionDenied, ValidationError
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.sales.models import Sale
+from apps.sales.models import SaleLineType
 from apps.sales.serializers import (
     SaleCreateResponseSerializer,
     SaleCreateSerializer,
@@ -37,6 +40,7 @@ class SalePagination(PageNumberPagination):
 class SaleListCreateAPIView(APIView):
     permission_classes = [IsAuthenticated]
     pagination_class = SalePagination
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
 
     def get_permissions(self):
         permissions = [IsAuthenticated()]
@@ -107,11 +111,42 @@ class SaleListCreateAPIView(APIView):
         )
 
     def post(self, request, *args, **kwargs):
-        serializer = SaleCreateSerializer(data=request.data)
+        is_multipart = (request.content_type or "").lower().startswith("multipart/form-data")
+        request_payload = request.data
+        if is_multipart:
+            raw_payload = request.data.get("payload")
+            if raw_payload in (None, ""):
+                raise ValidationError({"payload": "payload is required for multipart requests."})
+            try:
+                request_payload = json.loads(raw_payload)
+            except (TypeError, ValueError) as exc:
+                raise ValidationError({"payload": "Invalid JSON in payload field."}) from exc
+
+        serializer = SaleCreateSerializer(data=request_payload)
         serializer.is_valid(raise_exception=True)
+
+        tradein_rim_files = {}
+        if is_multipart:
+            for line in serializer.validated_data.get("lines", []):
+                if line.get("line_type") != SaleLineType.TRADEIN_RIM:
+                    continue
+                photo_field = line.get("photo_field")
+                if not photo_field:
+                    continue
+                uploaded_file = request.FILES.get(photo_field)
+                if uploaded_file is None:
+                    raise ValidationError(
+                        {"photo_field": f"File '{photo_field}' was not provided in multipart request."}
+                    )
+                tradein_rim_files[photo_field] = uploaded_file
+
         user = request.user if getattr(request.user, "is_authenticated", False) else None
         try:
-            payload = create_sale(payload=serializer.validated_data, user=user)
+            payload = create_sale(
+                payload=serializer.validated_data,
+                user=user,
+                tradein_rim_files=tradein_rim_files,
+            )
         except SaleForbiddenError as exc:
             raise PermissionDenied(detail=str(exc))
         except SaleConflictError as exc:

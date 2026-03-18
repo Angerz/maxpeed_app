@@ -10,6 +10,7 @@ class SaleLineRequest {
     this.assessedValue,
     this.tireConditionPercent,
     this.rimRequiresRepair,
+    this.photoField,
     this.tire,
     this.rim,
   });
@@ -24,6 +25,7 @@ class SaleLineRequest {
   final String? assessedValue;
   final int? tireConditionPercent;
   final bool? rimRequiresRepair;
+  final String? photoField;
   final Map<String, dynamic>? tire;
   final Map<String, dynamic>? rim;
 
@@ -39,6 +41,7 @@ class SaleLineRequest {
       'assessed_value': assessedValue,
       'tire_condition_percent': tireConditionPercent,
       'rim_requires_repair': rimRequiresRepair,
+      'photo_field': photoField,
       'tire': tire,
       'rim': rim,
     };

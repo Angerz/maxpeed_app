@@ -4,6 +4,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../models/brand_option.dart';
 import '../models/catalog_choice_option.dart';
@@ -521,8 +522,15 @@ class CatalogApiService {
         .toList();
   }
 
-  Future<SaleCreateResponse> createSale(SaleCreateRequest request) async {
+  Future<SaleCreateResponse> createSale(
+    SaleCreateRequest request, {
+    Map<String, XFile> tradeInRimPhotos = const {},
+  }) async {
     final uri = Uri.http('$host:$port', '/api/sales/');
+
+    if (tradeInRimPhotos.isNotEmpty) {
+      return _createSaleMultipart(uri, request, tradeInRimPhotos);
+    }
 
     http.Response response;
     try {
@@ -540,6 +548,59 @@ class CatalogApiService {
               );
             },
           );
+    } on http.ClientException catch (error) {
+      throw ApiException('Error de conexión: ${error.message}');
+    } on TimeoutException {
+      throw const ApiException(
+        'Tiempo de espera agotado al registrar venta. Verifica conexión y servidor.',
+      );
+    }
+
+    final decoded = _decodeResponse(response);
+    if (decoded is! Map<String, dynamic>) {
+      throw const ApiException('Respuesta inválida al crear venta');
+    }
+    return SaleCreateResponse.fromJson(decoded);
+  }
+
+  Future<SaleCreateResponse> _createSaleMultipart(
+    Uri uri,
+    SaleCreateRequest request,
+    Map<String, XFile> tradeInRimPhotos,
+  ) async {
+    final multipart = http.MultipartRequest('POST', uri);
+    multipart.headers.addAll(_buildHeaders(json: false, authenticated: true));
+    multipart.fields['payload'] = jsonEncode(request.toJson());
+
+    for (final entry in tradeInRimPhotos.entries) {
+      final xFile = entry.value;
+      final bytes = await xFile.readAsBytes();
+      final filename = xFile.name.trim().isEmpty
+          ? '${entry.key}.jpg'
+          : xFile.name;
+      multipart.files.add(
+        http.MultipartFile.fromBytes(
+          entry.key,
+          bytes,
+          filename: filename,
+          contentType: _resolveImageContentType(filename),
+        ),
+      );
+    }
+
+    http.Response response;
+    try {
+      final streamed = await _client
+          .send(multipart)
+          .timeout(
+            _requestTimeout,
+            onTimeout: () {
+              throw const ApiException(
+                'Tiempo de espera agotado al registrar venta. Verifica conexión y servidor.',
+              );
+            },
+          );
+      response = await http.Response.fromStream(streamed);
     } on http.ClientException catch (error) {
       throw ApiException('Error de conexión: ${error.message}');
     } on TimeoutException {

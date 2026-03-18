@@ -145,6 +145,7 @@ class SaleLineCreateSerializer(serializers.Serializer):
     tire_condition_percent = serializers.IntegerField(min_value=10, max_value=100, required=False, allow_null=True)
     rim_requires_repair = serializers.BooleanField(required=False, allow_null=True)
     notes = serializers.CharField(required=False, allow_blank=True, allow_null=True, max_length=1000)
+    photo_field = serializers.CharField(required=False, allow_blank=True, allow_null=True, max_length=120)
     tire = TradeInTirePayloadSerializer(required=False)
     rim = TradeInRimPayloadSerializer(required=False)
 
@@ -162,6 +163,7 @@ class SaleLineCreateSerializer(serializers.Serializer):
             attrs["assessed_value"] = None
             attrs["tire_condition_percent"] = None
             attrs["rim_requires_repair"] = None
+            attrs["photo_field"] = None
             attrs["tire"] = None
             attrs["rim"] = None
             return attrs
@@ -176,6 +178,7 @@ class SaleLineCreateSerializer(serializers.Serializer):
             attrs["assessed_value"] = None
             attrs["tire_condition_percent"] = None
             attrs["rim_requires_repair"] = None
+            attrs["photo_field"] = None
             attrs["tire"] = None
             attrs["rim"] = None
             return attrs
@@ -190,6 +193,8 @@ class SaleLineCreateSerializer(serializers.Serializer):
                 )
             if attrs.get("tire") is None:
                 raise serializers.ValidationError({"tire": "TRADEIN_TIRE requires tire payload."})
+            if attrs.get("photo_field"):
+                raise serializers.ValidationError({"photo_field": "photo_field is only supported for TRADEIN_RIM."})
             attrs["rim"] = None
 
         if line_type == SaleLineType.TRADEIN_RIM:
@@ -201,6 +206,10 @@ class SaleLineCreateSerializer(serializers.Serializer):
                 raise serializers.ValidationError({"rim": "TRADEIN_RIM requires rim payload."})
             if attrs.get("rim", {}).get("is_set") and attrs.get("quantity") != 1:
                 raise serializers.ValidationError({"quantity": "For rim is_set=true, quantity must be 1."})
+            photo_field = attrs.get("photo_field")
+            if photo_field is not None:
+                photo_field = photo_field.strip() or None
+            attrs["photo_field"] = photo_field
             attrs["tire"] = None
 
         attrs["inventory_item_id"] = None
@@ -256,6 +265,7 @@ class SaleCreateResponseSerializer(serializers.Serializer):
         created_inventory_item_id = serializers.IntegerField()
         catalog_item_id = serializers.IntegerField()
         movement_id = serializers.IntegerField()
+        rim_photo_saved = serializers.BooleanField(required=False, default=False)
 
     sale_id = serializers.IntegerField()
     totals = SaleTotalsSerializer()
