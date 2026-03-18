@@ -23,6 +23,7 @@ class InventoryScreen extends StatefulWidget {
     required this.canViewZeroStock,
     required this.canRestock,
     required this.canDeactivateRims,
+    required this.canViewPurchasePriceHistory,
   });
 
   final CartStore cartStore;
@@ -30,6 +31,7 @@ class InventoryScreen extends StatefulWidget {
   final bool canViewZeroStock;
   final bool canRestock;
   final bool canDeactivateRims;
+  final bool canViewPurchasePriceHistory;
 
   @override
   State<InventoryScreen> createState() => _InventoryScreenState();
@@ -238,6 +240,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
         inventoryItemId: item.inventoryItemId,
         apiService: _apiService,
         canRestock: widget.canRestock,
+        canViewPurchasePriceHistory: widget.canViewPurchasePriceHistory,
       ),
     );
   }

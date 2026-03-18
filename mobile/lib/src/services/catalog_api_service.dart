@@ -11,6 +11,7 @@ import '../models/catalog_choices.dart';
 import '../models/inventory_detail.dart';
 import '../models/inventory_group_response.dart';
 import '../models/login_response.dart';
+import '../models/purchase_price_history.dart';
 import '../models/rim_grouped_response.dart';
 import '../models/rim_receipt_request.dart';
 import '../models/restock_request.dart';
@@ -233,6 +234,22 @@ class CatalogApiService {
       throw const ApiException('Respuesta inválida al cargar detalle');
     }
     return InventoryDetail.fromJson(_normalizeImageUrlsInItem(response));
+  }
+
+  Future<PurchasePriceHistoryResponse> fetchPurchasePriceHistory(
+    int inventoryItemId,
+  ) async {
+    final uri = Uri.http(
+      '$host:$port',
+      '/api/inventory/items/$inventoryItemId/purchase-price-history/',
+    );
+    final response = await _getJson(uri);
+    if (response is! Map<String, dynamic>) {
+      throw const ApiException(
+        'Respuesta inválida al cargar historial de precios',
+      );
+    }
+    return PurchasePriceHistoryResponse.fromJson(response);
   }
 
   Future<RestockResponse> restockInventoryItem(

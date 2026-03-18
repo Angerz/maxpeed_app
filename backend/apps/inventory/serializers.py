@@ -261,3 +261,23 @@ class RimDeactivateResponseSerializer(serializers.Serializer):
     deactivated_at = serializers.DateTimeField(allow_null=True)
     owner = InventoryOwnerSerializer()
     message = serializers.CharField()
+
+
+class PurchasePriceHistoryPointSerializer(serializers.Serializer):
+    date = serializers.DateTimeField()
+    amount = serializers.DecimalField(max_digits=12, decimal_places=2)
+
+
+class PurchasePriceHistoryStatsSerializer(serializers.Serializer):
+    min = serializers.DecimalField(max_digits=12, decimal_places=2, allow_null=True)
+    max = serializers.DecimalField(max_digits=12, decimal_places=2, allow_null=True)
+    avg = serializers.DecimalField(max_digits=12, decimal_places=2, allow_null=True)
+
+
+class PurchasePriceHistoryResponseSerializer(serializers.Serializer):
+    inventory_item_id = serializers.IntegerField()
+    code = serializers.CharField(allow_null=True)
+    brand = serializers.CharField(allow_null=True)
+    current_purchase_price = serializers.DecimalField(max_digits=12, decimal_places=2, allow_null=True)
+    stats = PurchasePriceHistoryStatsSerializer()
+    points = PurchasePriceHistoryPointSerializer(many=True)

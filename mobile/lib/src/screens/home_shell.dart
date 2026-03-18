@@ -56,6 +56,9 @@ class _HomeShellState extends State<HomeShell> {
             canViewZeroStock: widget.sessionStore.can('can_view_zero_stock'),
             canRestock: widget.sessionStore.can('can_restock'),
             canDeactivateRims: widget.sessionStore.can('can_deactivate_rims'),
+            canViewPurchasePriceHistory: widget.sessionStore.can(
+              'can_view_purchase_price_history',
+            ),
           ),
         ),
       if (canCreateStockReceipt)

@@ -4,6 +4,7 @@ CAPABILITY_PERMISSION_MAP = {
     "can_create_stock_receipt": "inventory.create_stock_receipt",
     "can_restock": "inventory.restock",
     "can_deactivate_rims": "inventory.deactivate_rims",
+    "can_view_purchase_price_history": "inventory.view_purchase_price_history",
     "can_create_sale": "sales.create_sale",
     "can_view_sales": "sales.view_sales",
     "can_view_sale_detail": "sales.view_sale_detail",

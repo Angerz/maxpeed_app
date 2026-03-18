@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../models/inventory_detail.dart';
 import '../models/restock_request.dart';
+import '../screens/tire_purchase_price_history_screen.dart';
 import '../services/catalog_api_service.dart';
 
 class InventoryDetailSheet extends StatefulWidget {
@@ -11,11 +12,13 @@ class InventoryDetailSheet extends StatefulWidget {
     required this.inventoryItemId,
     required this.apiService,
     required this.canRestock,
+    required this.canViewPurchasePriceHistory,
   });
 
   final int inventoryItemId;
   final CatalogApiService apiService;
   final bool canRestock;
+  final bool canViewPurchasePriceHistory;
 
   @override
   State<InventoryDetailSheet> createState() => _InventoryDetailSheetState();
@@ -99,6 +102,22 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                   const Icon(Icons.image_not_supported_outlined, size: 72),
             )
           : const Icon(Icons.image_outlined, size: 72),
+    );
+  }
+
+  bool _isTireType(String rawType) {
+    const tireTypes = {'RADIAL', 'CARGO', 'MILLIMETRIC', 'CONVENTIONAL'};
+    return tireTypes.contains(rawType.trim().toUpperCase());
+  }
+
+  void _openPurchaseHistory() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => TirePurchasePriceHistoryScreen(
+          inventoryItemId: widget.inventoryItemId,
+          apiService: widget.apiService,
+        ),
+      ),
     );
   }
 
@@ -204,6 +223,18 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                   _row('Último restock', _formatDate(detail.lastRestockAt)),
                   _row('Creado', _formatDate(detail.createdAt)),
                   _row('Actualizado', _formatDate(detail.updatedAt)),
+                  if (widget.canViewPurchasePriceHistory &&
+                      _isTireType(detail.tireType)) ...[
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: _openPurchaseHistory,
+                        icon: const Icon(Icons.show_chart),
+                        label: const Text('Historial de precios'),
+                      ),
+                    ),
+                  ],
                   if (widget.canRestock) ...[
                     const SizedBox(height: 18),
                     SizedBox(

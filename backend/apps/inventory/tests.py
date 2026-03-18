@@ -1,10 +1,13 @@
 from decimal import Decimal
+from datetime import timedelta
 
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Permission
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -803,3 +806,168 @@ class InventoryImageApiTests(APITestCase):
         self.assertEqual(detail_fallback.status_code, status.HTTP_200_OK)
         self.assertEqual(detail_fallback.data["image"]["id"], logo_id)
         self.assertEqual(detail_fallback.data["image_thumb"]["id"], logo_id)
+
+
+class PurchasePriceHistoryApiTests(APITestCase):
+    def setUp(self):
+        user_model = get_user_model()
+        self.user_with_perm = user_model.objects.create_user(username="price_history_ok", password="testpass123")
+        self.user_without_perm = user_model.objects.create_user(username="price_history_no", password="testpass123")
+
+        self.owner, _ = Owner.objects.get_or_create(name="Maxpeed")
+        self.brand = Brand.objects.create(name="HABILEAD")
+        self.tire_catalog = CatalogItem.objects.create(
+            sku="TIRE-HABILEAD-265-65-R17-HL001",
+            code="265/65R17",
+            item_kind=ItemKind.MERCHANDISE,
+            product_category=ProductCategory.TIRE,
+            brand=self.brand,
+            model="HL001",
+            origin=Origin.CHINA,
+        )
+        TireSpec.objects.create(
+            catalog_item=self.tire_catalog,
+            tire_type=TireType.RADIAL,
+            width=265,
+            aspect_ratio=65,
+            rim_diameter="R17",
+            ply_rating="PR10",
+            tread_type="MT",
+            letter_color="BLACK",
+        )
+        self.tire_inventory = InventoryItem.objects.create(
+            catalog_item=self.tire_catalog,
+            owner=self.owner,
+            condition=InventoryCondition.NEW,
+            stock=5,
+        )
+
+        self.rim_catalog = CatalogItem.objects.create(
+            sku="RIM-ROMAX-TEST-001",
+            code="RIM-TEST-001",
+            item_kind=ItemKind.MERCHANDISE,
+            product_category=ProductCategory.RIM,
+            brand=Brand.objects.create(name="ROMAX"),
+            model=None,
+            origin=None,
+        )
+        RimSpec.objects.create(
+            catalog_item=self.rim_catalog,
+            rim_diameter="R17",
+            holes=5,
+            width_in=8,
+            material="ALUMINUM",
+            is_set=False,
+        )
+        self.rim_inventory = InventoryItem.objects.create(
+            catalog_item=self.rim_catalog,
+            owner=self.owner,
+            condition=InventoryCondition.NEW,
+            stock=2,
+        )
+
+        permission = Permission.objects.get(
+            content_type__app_label="inventory",
+            codename="view_purchase_price_history",
+        )
+        self.user_with_perm.user_permissions.add(permission)
+
+        self.url = reverse(
+            "inventory-item-purchase-price-history",
+            kwargs={"inventory_item_id": self.tire_inventory.id},
+        )
+
+    def _seed_purchase_history(self, *, total_points=3, with_current=True):
+        base = timezone.now() - timedelta(days=total_points + 2)
+        records = []
+        for idx in range(total_points):
+            valid_from = base + timedelta(days=idx)
+            valid_to = None if (with_current and idx == total_points - 1) else valid_from + timedelta(hours=12)
+            records.append(
+                PriceRecord.objects.create(
+                    inventory_item=self.tire_inventory,
+                    price_type=PriceType.PURCHASE,
+                    amount=Decimal("100.00") + Decimal(idx),
+                    valid_from=valid_from,
+                    valid_to=valid_to,
+                )
+            )
+        return records
+
+    def test_returns_200_for_tire_with_permission(self):
+        self._seed_purchase_history(total_points=3, with_current=True)
+        self.client.force_authenticate(user=self.user_with_perm)
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["inventory_item_id"], self.tire_inventory.id)
+        self.assertEqual(response.data["code"], "265/65R17")
+        self.assertEqual(response.data["brand"], "HABILEAD")
+        self.assertEqual(len(response.data["points"]), 3)
+        self.assertEqual(response.data["stats"]["min"], "100.00")
+        self.assertEqual(response.data["stats"]["max"], "102.00")
+        self.assertEqual(response.data["stats"]["avg"], "101.00")
+
+    def test_returns_403_without_permission(self):
+        self._seed_purchase_history(total_points=1, with_current=True)
+        self.client.force_authenticate(user=self.user_without_perm)
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_limits_points_to_last_twenty(self):
+        self._seed_purchase_history(total_points=25, with_current=True)
+        self.client.force_authenticate(user=self.user_with_perm)
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data["points"]), 20)
+
+    def test_points_are_ordered_ascending_by_date(self):
+        self._seed_purchase_history(total_points=5, with_current=True)
+        self.client.force_authenticate(user=self.user_with_perm)
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        dates = [point["date"] for point in response.data["points"]]
+        self.assertEqual(dates, sorted(dates))
+
+    def test_current_purchase_price_uses_current_or_fallback_latest(self):
+        records = self._seed_purchase_history(total_points=3, with_current=True)
+        self.client.force_authenticate(user=self.user_with_perm)
+
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["current_purchase_price"], "102.00")
+
+        records[-1].valid_to = records[-1].valid_from + timedelta(hours=1)
+        records[-1].save(update_fields=["valid_to"])
+        fallback_response = self.client.get(self.url)
+        self.assertEqual(fallback_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(fallback_response.data["current_purchase_price"], "102.00")
+
+    def test_returns_400_for_non_tire_inventory_item(self):
+        self.client.force_authenticate(user=self.user_with_perm)
+        url = reverse(
+            "inventory-item-purchase-price-history",
+            kwargs={"inventory_item_id": self.rim_inventory.id},
+        )
+
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_returns_404_when_inventory_item_not_found(self):
+        self.client.force_authenticate(user=self.user_with_perm)
+        url = reverse(
+            "inventory-item-purchase-price-history",
+            kwargs={"inventory_item_id": 999999},
+        )
+
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)

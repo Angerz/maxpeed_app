@@ -12,12 +12,17 @@ from apps.accounts.permissions import (
     CanDeactivateRims,
     CanRestock,
     CanViewInventory,
+    CanViewPurchasePriceHistory,
 )
 from apps.accounts.permissions import CanViewZeroStock
 from apps.images.models import ImageKind
 from apps.images.services import create_image_variants_from_upload
 
 from .services import get_inventory_cards_grouped_by_rim, get_inventory_item_detail_payload
+from .services.price_history import (
+    PurchasePriceHistoryValidationError,
+    get_purchase_price_history,
+)
 from .services.rims import (
     RimDeactivateForbiddenError,
     RimDeactivateValidationError,
@@ -31,6 +36,7 @@ from .models import InventoryItem
 from .serializers import (
     InventoryCardSerializer,
     InventoryDetailSerializer,
+    PurchasePriceHistoryResponseSerializer,
     RimInventoryCardSerializer,
     RimDeactivateResponseSerializer,
     RimDeactivateSerializer,
@@ -127,6 +133,22 @@ class InventoryItemRestockAPIView(APIView):
 
         response_serializer = RestockResponseSerializer(payload)
         return Response(response_serializer.data, status=status.HTTP_201_CREATED)
+
+
+class InventoryItemPurchasePriceHistoryAPIView(RetrieveAPIView):
+    permission_classes = [IsAuthenticated, CanViewPurchasePriceHistory]
+    queryset = InventoryItem.objects.select_related("catalog_item", "catalog_item__brand")
+    lookup_url_kwarg = "inventory_item_id"
+
+    def retrieve(self, request, *args, **kwargs):
+        inventory_item = self.get_object()
+        try:
+            payload = get_purchase_price_history(inventory_item)
+        except PurchasePriceHistoryValidationError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = PurchasePriceHistoryResponseSerializer(payload)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class RimReceiptCreateAPIView(APIView):

@@ -30,6 +30,10 @@ class CanDeactivateRims(DjangoPermissionRequired):
     required_permission = "inventory.deactivate_rims"
 
 
+class CanViewPurchasePriceHistory(DjangoPermissionRequired):
+    required_permission = "inventory.view_purchase_price_history"
+
+
 class CanCreateSale(DjangoPermissionRequired):
     required_permission = "sales.create_sale"
 

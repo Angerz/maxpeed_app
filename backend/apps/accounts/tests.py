@@ -77,6 +77,7 @@ class AuthCapabilityApiTests(APITestCase):
                 self._perm("inventory", "create_stock_receipt"),
                 self._perm("inventory", "restock"),
                 self._perm("inventory", "deactivate_rims"),
+                self._perm("inventory", "view_purchase_price_history"),
                 self._perm("sales", "create_sale"),
                 self._perm("sales", "view_sales"),
                 self._perm("sales", "view_sale_detail"),
@@ -113,6 +114,7 @@ class AuthCapabilityApiTests(APITestCase):
         self.assertIn("capabilities", response.data)
         self.assertTrue(response.data["capabilities"]["can_create_sale"])
         self.assertFalse(response.data["capabilities"]["can_view_zero_stock"])
+        self.assertFalse(response.data["capabilities"]["can_view_purchase_price_history"])
 
     def test_auth_me_and_logout(self):
         login = self.client.post(
@@ -166,6 +168,7 @@ class AuthCapabilityApiTests(APITestCase):
         self.assertEqual(caps.status_code, status.HTTP_200_OK)
         self.assertTrue(caps.data["can_view_zero_stock"])
         self.assertFalse(caps.data["can_create_sale"])
+        self.assertFalse(caps.data["can_view_purchase_price_history"])
 
         inv_response = self.client.get(f"{reverse('inventory-items')}?include_zero_stock=true")
         self.assertEqual(inv_response.status_code, status.HTTP_200_OK)
@@ -191,6 +194,10 @@ class AuthCapabilityApiTests(APITestCase):
 
         inv_response = self.client.get(f"{reverse('inventory-items')}?include_zero_stock=true")
         self.assertEqual(inv_response.status_code, status.HTTP_200_OK)
+
+        caps = self.client.get(reverse("capabilities"))
+        self.assertEqual(caps.status_code, status.HTTP_200_OK)
+        self.assertTrue(caps.data["can_view_purchase_price_history"])
 
         sale_response = self.client.post(
             reverse("sales-list-create"),

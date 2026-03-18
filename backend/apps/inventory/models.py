@@ -102,6 +102,7 @@ class InventoryItem(models.Model):
             ("create_stock_receipt", "Can create stock receipt"),
             ("restock", "Can restock inventory"),
             ("deactivate_rims", "Can deactivate rim inventory"),
+            ("view_purchase_price_history", "Can view purchase price history"),
         ]
         constraints = [
             models.UniqueConstraint(
