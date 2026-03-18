@@ -453,6 +453,39 @@ class RimReceiptApiTests(APITestCase):
         self.assertNotIn("R16", response.data)
         self.assertEqual(response.data["R15"][0]["internal_code"], "RIM-001")
 
+    def test_get_rims_includes_used_condition_items(self):
+        catalog_item = CatalogItem.objects.create(
+            sku="RIM-ROMAX-USED-001",
+            code="RIM-USED-001",
+            item_kind=ItemKind.MERCHANDISE,
+            product_category=ProductCategory.RIM,
+            brand=self.brand,
+            model=None,
+            origin=None,
+        )
+        RimSpec.objects.create(
+            catalog_item=catalog_item,
+            rim_diameter="R15",
+            holes=5,
+            width_in=8,
+            material="ALUMINUM",
+            is_set=True,
+        )
+        used_item = InventoryItem.objects.create(
+            catalog_item=catalog_item,
+            condition=InventoryCondition.USED,
+            owner=self.owner,
+            stock=1,
+            is_active=True,
+        )
+
+        response = self.client.get(self.list_url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("R15", response.data)
+        ids = [card["inventory_item_id"] for card in response.data["R15"]]
+        self.assertIn(used_item.id, ids)
+
 
 class RimDeactivateApiTests(APITestCase):
     def setUp(self):

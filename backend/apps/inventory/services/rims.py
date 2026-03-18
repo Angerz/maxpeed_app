@@ -199,7 +199,6 @@ def get_rim_inventory_cards_grouped():
     queryset = (
         InventoryItem.objects.filter(
             catalog_item__product_category=ProductCategory.RIM,
-            condition=InventoryCondition.NEW,
             stock__gt=0,
             is_active=True,
         )
