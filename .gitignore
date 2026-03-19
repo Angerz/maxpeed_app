@@ -11,7 +11,7 @@ Thumbs.db
 .env.*
 !.env.example
 *.pem
-
+*.md
 # -----------------
 # Backend (Django)
 # -----------------
@@ -69,3 +69,4 @@ mobile/macos/Runner.xcodeproj/xcuserdata/
 # Windows / Linux generated
 mobile/windows/flutter/ephemeral/
 mobile/linux/flutter/ephemeral/
+.env.example

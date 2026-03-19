@@ -37,7 +37,7 @@ services:
     volumes:
       - ../backend:/app:delegated
       - backend_static:/app/staticfiles
-    command: ["bash", "/app/scripts/dev.sh"]
+    command: ["bash", "/app/scripts/prod.sh"]
     user: "1000:1000"
 
 volumes:
