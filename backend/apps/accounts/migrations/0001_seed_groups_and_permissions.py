@@ -5,9 +5,17 @@ def seed_groups_and_permissions(apps, schema_editor):
     ContentType = apps.get_model("contenttypes", "ContentType")
     Group = apps.get_model("auth", "Group")
     Permission = apps.get_model("auth", "Permission")
+    InventoryItem = apps.get_model("inventory", "InventoryItem")
+    Sale = apps.get_model("sales", "Sale")
 
-    inventory_ct = ContentType.objects.get(app_label="inventory", model="inventoryitem")
-    sale_ct = ContentType.objects.get(app_label="sales", model="sale")
+    inventory_ct, _ = ContentType.objects.get_or_create(
+        app_label=InventoryItem._meta.app_label,
+        model=InventoryItem._meta.model_name,
+    )
+    sale_ct, _ = ContentType.objects.get_or_create(
+        app_label=Sale._meta.app_label,
+        model=Sale._meta.model_name,
+    )
 
     permission_specs = [
         ("inventory", "view_inventory", "Can view inventory", inventory_ct),
