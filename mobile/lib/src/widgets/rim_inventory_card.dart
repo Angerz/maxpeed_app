@@ -36,7 +36,8 @@ class RimInventoryCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(14),
           child: Stack(
             children: [
-              if (item.conditionLabel != null && item.conditionLabel!.isNotEmpty)
+              if (item.conditionLabel != null &&
+                  item.conditionLabel!.isNotEmpty)
                 Positioned(
                   top: 12,
                   right: 12,
