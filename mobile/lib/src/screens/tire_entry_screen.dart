@@ -471,7 +471,7 @@ class _TireEntryFormState extends State<_TireEntryForm> {
             ),
             const SizedBox(height: 12),
             _buildChoiceField(
-              label: 'Diseño',
+              label: 'Cocada',
               fieldKey: 'tread_type',
               items: choices.treadTypes,
               value: _selectedTreadType,

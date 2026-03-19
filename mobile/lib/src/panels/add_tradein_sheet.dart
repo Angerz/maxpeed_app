@@ -686,7 +686,7 @@ class _AddTradeInSheetState extends State<AddTradeInSheet> {
         const SizedBox(height: 12),
         DropdownButtonFormField<CatalogChoiceOption>(
           initialValue: _selectedTread,
-          decoration: const InputDecoration(labelText: 'Diseño *'),
+          decoration: const InputDecoration(labelText: 'Cocada *'),
           items: choices.treadTypes
               .map(
                 (option) =>
@@ -694,7 +694,7 @@ class _AddTradeInSheetState extends State<AddTradeInSheet> {
               )
               .toList(),
           onChanged: (value) => setState(() => _selectedTread = value),
-          validator: (value) => value == null ? 'Selecciona diseño' : null,
+          validator: (value) => value == null ? 'Selecciona cocada' : null,
         ),
         const SizedBox(height: 12),
         DropdownButtonFormField<CatalogChoiceOption>(
