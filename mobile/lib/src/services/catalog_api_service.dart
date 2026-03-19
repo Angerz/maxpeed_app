@@ -32,15 +32,35 @@ class ApiException implements Exception {
 }
 
 class CatalogApiService {
+  static final Uri _apiBaseUri = Uri.parse(
+    const String.fromEnvironment(
+      'API_BASE_URL',
+      defaultValue: 'http://192.168.18.24:8001',
+    ),
+  );
+
   CatalogApiService({
     http.Client? client,
-    this.host = '192.168.18.24',
-    this.port = 8001,
+    this.host = _defaultHost,
+    this.port = _defaultPort,
+    this.scheme = _defaultScheme,
   }) : _client = client ?? http.Client();
+
+  static String get _defaultHost =>
+      _apiBaseUri.host.isEmpty ? '192.168.18.24' : _apiBaseUri.host;
+  static int get _defaultPort {
+    if (_apiBaseUri.hasPort) {
+      return _apiBaseUri.port;
+    }
+    return _apiBaseUri.scheme == 'https' ? 443 : 80;
+  }
+  static String get _defaultScheme =>
+      _apiBaseUri.scheme.isEmpty ? 'http' : _apiBaseUri.scheme;
 
   final http.Client _client;
   final String host;
   final int port;
+  final String scheme;
   static const Duration _requestTimeout = Duration(seconds: 8);
   static String? _authToken;
   static VoidCallback? _onUnauthorized;
@@ -53,8 +73,17 @@ class CatalogApiService {
     _onUnauthorized = callback;
   }
 
+  Uri _buildApiUri(String path, [Map<String, String>? queryParameters]) {
+    final authority = (scheme == 'https' && port == 443) || (scheme == 'http' && port == 80)
+        ? host
+        : '$host:$port';
+    return scheme == 'https'
+        ? Uri.https(authority, path, queryParameters)
+        : Uri.http(authority, path, queryParameters);
+  }
+
   Future<CatalogChoices> fetchChoices() async {
-    final uri = Uri.http('$host:$port', '/api/catalog/choices/');
+    final uri = _buildApiUri('/api/catalog/choices/');
     final response = await _getJson(uri);
     if (response is! Map<String, dynamic>) {
       throw const ApiException('Respuesta inválida al cargar opciones');
@@ -64,8 +93,7 @@ class CatalogApiService {
 
   Future<List<BrandOption>> searchBrands(String query) async {
     final trimmed = query.trim();
-    final uri = Uri.http(
-      '$host:$port',
+    final uri = _buildApiUri(
       '/api/catalog/brands/',
       trimmed.isEmpty ? null : {'search': trimmed},
     );
@@ -83,7 +111,7 @@ class CatalogApiService {
   }
 
   Future<List<BrandOption>> fetchRimBrands() async {
-    final uri = Uri.http('$host:$port', '/api/catalog/rim-brands/');
+    final uri = _buildApiUri('/api/catalog/rim-brands/');
     final response = await _getJson(uri);
     final rawList = response is List
         ? response
@@ -113,7 +141,7 @@ class CatalogApiService {
     String? recommendedSalePrice,
     String? model,
   }) async {
-    final uri = Uri.http('$host:$port', '/api/inventory/stock-receipts/');
+    final uri = _buildApiUri('/api/inventory/stock-receipts/');
     final payload = <String, dynamic>{
       'tire_type': tireType,
       'brand_id': brandId,
@@ -200,7 +228,7 @@ class CatalogApiService {
   Future<InventoryGroupResponse> fetchInventory({
     required bool includeZeroStock,
   }) async {
-    final uri = Uri.http('$host:$port', '/api/inventory/items/', {
+    final uri = _buildApiUri('/api/inventory/items/', {
       'include_zero_stock': includeZeroStock.toString(),
     });
     final response = await _getJson(uri);
@@ -213,7 +241,7 @@ class CatalogApiService {
   }
 
   Future<RimGroupedResponse> fetchRimsInventory() async {
-    final uri = Uri.http('$host:$port', '/api/inventory/rims/');
+    final uri = _buildApiUri('/api/inventory/rims/');
     final response = await _getJson(uri);
     if (response is! Map<String, dynamic>) {
       throw const ApiException(
@@ -226,8 +254,7 @@ class CatalogApiService {
   }
 
   Future<InventoryDetail> fetchInventoryDetail(int inventoryItemId) async {
-    final uri = Uri.http(
-      '$host:$port',
+    final uri = _buildApiUri(
       '/api/inventory/items/$inventoryItemId/',
     );
     final response = await _getJson(uri);
@@ -240,8 +267,7 @@ class CatalogApiService {
   Future<PurchasePriceHistoryResponse> fetchPurchasePriceHistory(
     int inventoryItemId,
   ) async {
-    final uri = Uri.http(
-      '$host:$port',
+    final uri = _buildApiUri(
       '/api/inventory/items/$inventoryItemId/purchase-price-history/',
     );
     final response = await _getJson(uri);
@@ -257,8 +283,7 @@ class CatalogApiService {
     int inventoryItemId,
     RestockRequest requestPayload,
   ) async {
-    final uri = Uri.http(
-      '$host:$port',
+    final uri = _buildApiUri(
       '/api/inventory/items/$inventoryItemId/restock/',
     );
 
@@ -295,7 +320,7 @@ class CatalogApiService {
   }
 
   Future<Map<String, dynamic>> postRimReceipt(RimReceiptRequest request) async {
-    final uri = Uri.http('$host:$port', '/api/inventory/rim-receipts/');
+    final uri = _buildApiUri('/api/inventory/rim-receipts/');
     if (request.rimPhotoBytes != null) {
       return _postRimReceiptMultipart(uri, request);
     }
@@ -397,7 +422,7 @@ class CatalogApiService {
     if (parsed != null && parsed.hasScheme) {
       return raw;
     }
-    final base = Uri.http('$host:$port');
+    final base = _buildApiUri('/');
     final resolved = base.resolve(raw);
     return resolved.toString();
   }
@@ -472,8 +497,7 @@ class CatalogApiService {
   }
 
   Future<void> deactivateRim(int inventoryItemId, {String? reason}) async {
-    final uri = Uri.http(
-      '$host:$port',
+    final uri = _buildApiUri(
       '/api/inventory/rims/$inventoryItemId/deactivate/',
     );
     final payload = reason == null || reason.trim().isEmpty
@@ -508,7 +532,7 @@ class CatalogApiService {
   }
 
   Future<List<ServiceOption>> fetchServices() async {
-    final uri = Uri.http('$host:$port', '/api/catalog/services/');
+    final uri = _buildApiUri('/api/catalog/services/');
     final response = await _getJson(uri);
     final rawList = response is List
         ? response
@@ -526,7 +550,7 @@ class CatalogApiService {
     SaleCreateRequest request, {
     Map<String, XFile> tradeInRimPhotos = const {},
   }) async {
-    final uri = Uri.http('$host:$port', '/api/sales/');
+    final uri = _buildApiUri('/api/sales/');
 
     if (tradeInRimPhotos.isNotEmpty) {
       return _createSaleMultipart(uri, request, tradeInRimPhotos);
@@ -626,7 +650,7 @@ class CatalogApiService {
       if (start == null || end == null) {
         throw const ApiException('Rango de fechas inválido para cargar ventas');
       }
-      uri = Uri.http('$host:$port', '/api/sales/', {
+      uri = _buildApiUri('/api/sales/', {
         'start_date': _toYmd(start),
         'end_date': _toYmd(end),
       });
@@ -634,7 +658,7 @@ class CatalogApiService {
       uri = Uri.parse(url);
     } else {
       final parsed = Uri.parse(url);
-      uri = Uri.http('$host:$port', parsed.path, parsed.queryParameters);
+      uri = _buildApiUri(parsed.path, parsed.queryParameters);
     }
     final response = await _getJson(uri);
     if (response is! Map<String, dynamic>) {
@@ -644,7 +668,7 @@ class CatalogApiService {
   }
 
   Future<SaleDetail> fetchSaleDetail(int id) async {
-    final uri = Uri.http('$host:$port', '/api/sales/$id/');
+    final uri = _buildApiUri('/api/sales/$id/');
     final response = await _getJson(uri);
     if (response is! Map<String, dynamic>) {
       throw const ApiException('Respuesta inválida al cargar detalle de venta');
@@ -685,7 +709,7 @@ class CatalogApiService {
     required String username,
     required String password,
   }) async {
-    final uri = Uri.http('$host:$port', '/api/auth/login/');
+    final uri = _buildApiUri('/api/auth/login/');
     http.Response response;
     try {
       response = await _client
@@ -716,7 +740,7 @@ class CatalogApiService {
   }
 
   Future<void> logout() async {
-    final uri = Uri.http('$host:$port', '/api/auth/logout/');
+    final uri = _buildApiUri('/api/auth/logout/');
     try {
       final response = await _client
           .post(
@@ -732,7 +756,7 @@ class CatalogApiService {
   }
 
   Future<Capabilities> fetchCapabilities() async {
-    final uri = Uri.http('$host:$port', '/api/capabilities/');
+    final uri = _buildApiUri('/api/capabilities/');
     final response = await _getJson(uri, authenticated: true);
     if (response is Map<String, dynamic>) {
       final source = response['capabilities'] ?? response;
