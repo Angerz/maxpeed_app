@@ -32,30 +32,12 @@ class ApiException implements Exception {
 }
 
 class CatalogApiService {
-  static final Uri _apiBaseUri = Uri.parse(
-    const String.fromEnvironment(
-      'API_BASE_URL',
-      defaultValue: 'http://192.168.18.24:8001',
-    ),
-  );
-
   CatalogApiService({
     http.Client? client,
-    this.host = _defaultHost,
-    this.port = _defaultPort,
-    this.scheme = _defaultScheme,
+    this.host = 'apis.maxpeedtires.com',
+    this.port = 443,
+    this.scheme = 'https',
   }) : _client = client ?? http.Client();
-
-  static String get _defaultHost =>
-      _apiBaseUri.host.isEmpty ? '192.168.18.24' : _apiBaseUri.host;
-  static int get _defaultPort {
-    if (_apiBaseUri.hasPort) {
-      return _apiBaseUri.port;
-    }
-    return _apiBaseUri.scheme == 'https' ? 443 : 80;
-  }
-  static String get _defaultScheme =>
-      _apiBaseUri.scheme.isEmpty ? 'http' : _apiBaseUri.scheme;
 
   final http.Client _client;
   final String host;

@@ -7,8 +7,7 @@ RUN flutter pub get
 
 COPY . .
 
-ARG API_BASE_URL=https://apis.maxpeedtires.com
-RUN flutter build web --release --dart-define=API_BASE_URL=${API_BASE_URL}
+RUN flutter build web --release
 
 FROM nginx:1.27-alpine
 
