@@ -11,6 +11,7 @@ class InventoryCardItem {
     required this.owner,
     required this.imageThumb,
     required this.image,
+    required this.conditionLabel,
   });
 
   final int inventoryItemId;
@@ -21,11 +22,13 @@ class InventoryCardItem {
   final Owner? owner;
   final ImageRef? imageThumb;
   final ImageRef? image;
+  final String? conditionLabel;
 
   factory InventoryCardItem.fromJson(Map<String, dynamic> json) {
     final ownerRaw = json['owner'];
     final imageThumbRaw = json['image_thumb'];
     final imageRaw = json['image'];
+    final conditionRaw = json['condition_label']?.toString().trim();
     return InventoryCardItem(
       inventoryItemId: (json['inventory_item_id'] as num?)?.toInt() ?? 0,
       code: (json['code'] ?? '').toString(),
@@ -39,6 +42,9 @@ class InventoryCardItem {
       image: imageRaw is Map<String, dynamic>
           ? ImageRef.fromJson(imageRaw)
           : null,
+      conditionLabel: (conditionRaw == null || conditionRaw.isEmpty)
+          ? null
+          : conditionRaw,
     );
   }
 }

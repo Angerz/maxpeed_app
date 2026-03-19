@@ -70,6 +70,13 @@ def _spanish_material(value):
     return RIM_SPANISH_LABELS["material"].get(value, value)
 
 
+def _condition_label(condition):
+    return {
+        InventoryCondition.NEW: "NUEVO",
+        InventoryCondition.USED: "USADO",
+    }.get(condition, str(condition or ""))
+
+
 @transaction.atomic
 def create_rim_stock_receipt(*, payload, user=None):
     now = timezone.now()
@@ -239,6 +246,7 @@ def get_rim_inventory_cards_grouped():
                     f"{set_label}"
                 ),
                 "owner": {"id": inventory_item.owner.id, "name": inventory_item.owner.name},
+                "condition_label": _condition_label(inventory_item.condition),
                 "image": _build_image_ref(rim_full),
                 "image_thumb": _build_image_ref(rim_thumb),
             }

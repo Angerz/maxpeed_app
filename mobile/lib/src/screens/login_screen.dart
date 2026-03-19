@@ -72,7 +72,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Image.asset(
-                      'assets/maxpeed.png',
+                      'assets/maxpeed_new_nobg.png',
                       height: 92,
                       fit: BoxFit.contain,
                       errorBuilder: (context, error, stackTrace) =>

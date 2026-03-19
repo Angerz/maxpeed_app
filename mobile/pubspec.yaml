@@ -28,4 +28,6 @@ flutter:
     - assets/brands/
     - assets/icons/
     - assets/maxpeed.png
+    - assets/maxpeed_new_nobg.png
+    - assets/maxpeed_new.ico
     - assets/maxpeed_logo.ico

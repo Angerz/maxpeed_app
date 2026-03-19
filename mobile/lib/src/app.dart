@@ -303,7 +303,7 @@ class _PostLoginLogoTransitionState extends State<_PostLoginLogoTransition> {
             curve: Curves.easeInCubic,
             onEnd: _finish,
             child: Image.asset(
-              'assets/maxpeed.png',
+              'assets/maxpeed_new_nobg.png',
               width: 130,
               height: 130,
               fit: BoxFit.contain,

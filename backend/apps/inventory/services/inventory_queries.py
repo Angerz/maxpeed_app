@@ -1,7 +1,7 @@
 from collections import OrderedDict
 
 from apps.catalog.choices import ProductCategory
-from apps.inventory.models import InventoryItem, PriceRecord, PriceType
+from apps.inventory.models import InventoryCondition, InventoryItem, PriceRecord, PriceType
 
 
 SPANISH_LABELS = {
@@ -67,6 +67,13 @@ def _spanish_letter_color(value):
     if not value:
         return value
     return f"LETRA {_spanish_label('letter_color', value)}"
+
+
+def _condition_label(condition):
+    return {
+        InventoryCondition.NEW: "NUEVO",
+        InventoryCondition.USED: "USADO",
+    }.get(condition, str(condition or ""))
 
 
 def _rim_sort_key(rim_value):
@@ -159,6 +166,7 @@ def get_inventory_cards_grouped_by_rim(*, include_zero_stock=False):
                 "stock": inventory_item.stock,
                 "details": details,
                 "owner": {"id": inventory_item.owner.id, "name": inventory_item.owner.name},
+                "condition_label": _condition_label(inventory_item.condition),
                 "image": _build_image_ref(brand_full),
                 "image_thumb": _build_image_ref(brand_thumb),
             }

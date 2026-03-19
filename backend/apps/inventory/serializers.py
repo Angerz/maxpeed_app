@@ -111,6 +111,7 @@ class InventoryCardSerializer(serializers.Serializer):
     stock = serializers.IntegerField()
     details = serializers.CharField()
     owner = InventoryOwnerSerializer()
+    condition_label = serializers.CharField()
     image = ImageRefSerializer(allow_null=True)
     image_thumb = ImageRefSerializer(allow_null=True)
 
@@ -246,6 +247,7 @@ class RimInventoryCardSerializer(serializers.Serializer):
     stock = serializers.IntegerField()
     details = serializers.CharField()
     owner = InventoryOwnerSerializer()
+    condition_label = serializers.CharField()
     image = ImageRefSerializer(allow_null=True)
     image_thumb = ImageRefSerializer(allow_null=True)
 

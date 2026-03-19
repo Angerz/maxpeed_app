@@ -176,6 +176,15 @@ class StockReceiptApiTests(APITestCase):
         self.assertEqual(default_response.data["R15"][0]["inventory_item_id"], item_r15.id)
         self.assertEqual(with_zero_response.data["R12"][0]["inventory_item_id"], item_r12.id)
 
+    def test_inventory_items_list_returns_condition_label_in_spanish(self):
+        response = self.client.post(self.url, self.payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        list_response = self.client.get(reverse("inventory-items"))
+        self.assertEqual(list_response.status_code, status.HTTP_200_OK)
+        card = list_response.data["R15"][0]
+        self.assertEqual(card["condition_label"], "NUEVO")
+
     def test_inventory_item_detail_uses_last_historical_price_when_stock_zero(self):
         response = self.client.post(self.url, self.payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -485,6 +494,8 @@ class RimReceiptApiTests(APITestCase):
         self.assertIn("R15", response.data)
         ids = [card["inventory_item_id"] for card in response.data["R15"]]
         self.assertIn(used_item.id, ids)
+        used_card = next(card for card in response.data["R15"] if card["inventory_item_id"] == used_item.id)
+        self.assertEqual(used_card["condition_label"], "USADO")
 
 
 class RimDeactivateApiTests(APITestCase):
