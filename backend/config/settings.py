@@ -90,6 +90,7 @@ INSTALLED_APPS = [
     "rest_framework.authtoken",
     "apps.accounts",
     "apps.catalog",
+    "apps.device_control",
     "apps.finance",
     "apps.images",
     "apps.inventory",
@@ -221,3 +222,5 @@ REST_FRAMEWORK = {
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+DEVICE_CONTROL_API_KEY = os.getenv("DEVICE_CONTROL_API_KEY", "").strip()

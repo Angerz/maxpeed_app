@@ -21,6 +21,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include('apps.accounts.urls')),
     path('api/catalog/', include('apps.catalog.urls')),
+    path('api/device-control/', include('apps.device_control.urls')),
     path('api/images/', include('apps.images.urls')),
     path('api/inventory/', include('apps.inventory.urls')),
     path('api/sales/', include('apps.sales.urls')),
