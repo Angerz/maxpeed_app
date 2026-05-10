@@ -7,7 +7,6 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .models import DeviceControlState, ProcessStatus
-from .permissions import HasOptionalDeviceApiKey
 from .serializers import (
     HealthWriteSerializer,
     ProcessCommandWriteSerializer,
@@ -25,8 +24,6 @@ def _get_state() -> DeviceControlState:
 
 
 class ProcessCommandAPIView(APIView):
-    permission_classes = [HasOptionalDeviceApiKey]
-
     def post(self, request, *args, **kwargs):
         serializer = ProcessCommandWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -75,15 +72,11 @@ class ProcessCommandAPIView(APIView):
 
 
 class ProcessCommandStatusAPIView(APIView):
-    permission_classes = [HasOptionalDeviceApiKey]
-
     def get(self, request, *args, **kwargs):
         return Response(serialize_process_command(_get_state()), status=status.HTTP_200_OK)
 
 
 class ProcessStateAPIView(APIView):
-    permission_classes = [HasOptionalDeviceApiKey]
-
     def post(self, request, *args, **kwargs):
         serializer = ProcessStateWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -125,8 +118,6 @@ class ProcessStateAPIView(APIView):
 
 
 class WifiCredentialsAPIView(APIView):
-    permission_classes = [HasOptionalDeviceApiKey]
-
     def post(self, request, *args, **kwargs):
         serializer = WifiCredentialsWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -173,8 +164,6 @@ class WifiCredentialsAPIView(APIView):
 
 
 class WifiCredentialsStatusAPIView(APIView):
-    permission_classes = [HasOptionalDeviceApiKey]
-
     def get(self, request, *args, **kwargs):
         return Response(
             serialize_wifi_credentials(_get_state(), include_secret=False),
@@ -183,8 +172,6 @@ class WifiCredentialsStatusAPIView(APIView):
 
 
 class HealthCheckAPIView(APIView):
-    permission_classes = [HasOptionalDeviceApiKey]
-
     def post(self, request, *args, **kwargs):
         serializer = HealthWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -211,8 +198,6 @@ class HealthCheckAPIView(APIView):
 
 
 class DeviceControlStatusAPIView(APIView):
-    permission_classes = [HasOptionalDeviceApiKey]
-
     def get(self, request, *args, **kwargs):
         state = _get_state()
         return Response(
