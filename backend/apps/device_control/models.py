@@ -8,6 +8,13 @@ class ProcessMode(models.TextChoices):
     MANUAL = "manual", "Manual"
 
 
+class ProcessStatus(models.TextChoices):
+    INACTIVE = "inactive", "Inactive"
+    IN_PROCESS = "in_process", "In process"
+    STARTED = "started", "Started"
+    FINISHED = "finished", "Finished"
+
+
 class DeviceControlState(models.Model):
     singleton_key = models.CharField(max_length=32, unique=True, default="main")
 
@@ -19,8 +26,15 @@ class DeviceControlState(models.Model):
     )
     delay_seconds = models.PositiveIntegerField(default=0)
     start_requested = models.BooleanField(default=False)
+    process_status = models.CharField(
+        max_length=16,
+        choices=ProcessStatus.choices,
+        default=ProcessStatus.INACTIVE,
+    )
     process_requested_at = models.DateTimeField(null=True, blank=True)
     process_picked_up_at = models.DateTimeField(null=True, blank=True)
+    process_started_at = models.DateTimeField(null=True, blank=True)
+    process_finished_at = models.DateTimeField(null=True, blank=True)
 
     wifi_command_id = models.UUIDField(default=uuid.uuid4, editable=False)
     wifi_ssid = models.CharField(max_length=64, blank=True)
@@ -42,4 +56,3 @@ class DeviceControlState(models.Model):
 
     def __str__(self) -> str:
         return self.singleton_key
-

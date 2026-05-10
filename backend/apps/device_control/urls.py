@@ -5,6 +5,7 @@ from .views import (
     HealthCheckAPIView,
     ProcessCommandAPIView,
     ProcessCommandStatusAPIView,
+    ProcessStateAPIView,
     WifiCredentialsAPIView,
     WifiCredentialsStatusAPIView,
 )
@@ -12,6 +13,7 @@ from .views import (
 
 urlpatterns = [
     path("process/", ProcessCommandAPIView.as_view(), name="device-control-process"),
+    path("process/state/", ProcessStateAPIView.as_view(), name="device-control-process-state"),
     path(
         "process/status/",
         ProcessCommandStatusAPIView.as_view(),
@@ -26,4 +28,3 @@ urlpatterns = [
     path("health/", HealthCheckAPIView.as_view(), name="device-control-health"),
     path("status/", DeviceControlStatusAPIView.as_view(), name="device-control-status"),
 ]
-

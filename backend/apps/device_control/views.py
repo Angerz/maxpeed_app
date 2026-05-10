@@ -6,11 +6,12 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import DeviceControlState
+from .models import DeviceControlState, ProcessStatus
 from .permissions import HasOptionalDeviceApiKey
 from .serializers import (
     HealthWriteSerializer,
     ProcessCommandWriteSerializer,
+    ProcessStateWriteSerializer,
     WifiCredentialsWriteSerializer,
     serialize_health,
     serialize_process_command,
@@ -39,16 +40,22 @@ class ProcessCommandAPIView(APIView):
             state.process_mode = data["mode"]
             state.delay_seconds = data["delay_seconds"]
             state.start_requested = data["start"]
+            state.process_status = ProcessStatus.IN_PROCESS
             state.process_requested_at = timezone.now()
             state.process_picked_up_at = None
+            state.process_started_at = None
+            state.process_finished_at = None
             state.save(
                 update_fields=[
                     "process_command_id",
                     "process_mode",
                     "delay_seconds",
                     "start_requested",
+                    "process_status",
                     "process_requested_at",
                     "process_picked_up_at",
+                    "process_started_at",
+                    "process_finished_at",
                     "updated_at",
                 ]
             )
@@ -72,6 +79,49 @@ class ProcessCommandStatusAPIView(APIView):
 
     def get(self, request, *args, **kwargs):
         return Response(serialize_process_command(_get_state()), status=status.HTTP_200_OK)
+
+
+class ProcessStateAPIView(APIView):
+    permission_classes = [HasOptionalDeviceApiKey]
+
+    def post(self, request, *args, **kwargs):
+        serializer = ProcessStateWriteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        now = timezone.now()
+        state = _get_state()
+        state.process_status = data["status"]
+        if data["status"] == ProcessStatus.STARTED:
+            state.process_started_at = now
+            state.process_finished_at = None
+        elif data["status"] == ProcessStatus.FINISHED:
+            state.process_finished_at = now
+        elif data["status"] == ProcessStatus.INACTIVE:
+            state.start_requested = False
+            state.delay_seconds = 0
+            state.process_requested_at = None
+            state.process_picked_up_at = None
+            state.process_started_at = None
+            state.process_finished_at = None
+
+        if data["message"]:
+            state.health_message = data["message"]
+
+        state.save(
+            update_fields=[
+                "process_status",
+                "start_requested",
+                "delay_seconds",
+                "process_requested_at",
+                "process_picked_up_at",
+                "process_started_at",
+                "process_finished_at",
+                "health_message",
+                "updated_at",
+            ]
+        )
+        return Response(serialize_process_command(state), status=status.HTTP_200_OK)
 
 
 class WifiCredentialsAPIView(APIView):
@@ -173,4 +223,3 @@ class DeviceControlStatusAPIView(APIView):
             },
             status=status.HTTP_200_OK,
         )
-
