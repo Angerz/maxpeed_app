@@ -56,7 +56,8 @@ class CatalogApiService {
   }
 
   Uri _buildApiUri(String path, [Map<String, String>? queryParameters]) {
-    final authority = (scheme == 'https' && port == 443) || (scheme == 'http' && port == 80)
+    final authority =
+        (scheme == 'https' && port == 443) || (scheme == 'http' && port == 80)
         ? host
         : '$host:$port';
     return scheme == 'https'
@@ -236,9 +237,7 @@ class CatalogApiService {
   }
 
   Future<InventoryDetail> fetchInventoryDetail(int inventoryItemId) async {
-    final uri = _buildApiUri(
-      '/api/inventory/items/$inventoryItemId/',
-    );
+    final uri = _buildApiUri('/api/inventory/items/$inventoryItemId/');
     final response = await _getJson(uri);
     if (response is! Map<String, dynamic>) {
       throw const ApiException('Respuesta inválida al cargar detalle');
@@ -265,9 +264,7 @@ class CatalogApiService {
     int inventoryItemId,
     RestockRequest requestPayload,
   ) async {
-    final uri = _buildApiUri(
-      '/api/inventory/items/$inventoryItemId/restock/',
-    );
+    final uri = _buildApiUri('/api/inventory/items/$inventoryItemId/restock/');
 
     http.Response response;
     try {
@@ -828,6 +825,7 @@ class CatalogApiService {
         'MEXICAN': 'Mexicana',
         'EUROPE': 'Europea',
         'PERUVIAN': 'Peruana',
+        'VIETNAMESE': 'Vietnamita',
         'OTHER': 'Otra',
       },
       'tread_type': {

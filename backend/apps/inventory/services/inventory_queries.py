@@ -21,6 +21,7 @@ SPANISH_LABELS = {
         "MEXICAN": "Mexicana",
         "EUROPE": "Europea",
         "PERUVIAN": "Peruana",
+        "VIETNAMESE": "Vietnamita",
         "OTHER": "Otra",
     },
     "tread_type": {

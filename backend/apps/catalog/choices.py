@@ -29,6 +29,7 @@ class Origin(models.TextChoices):
     MEXICAN = "MEXICAN", "Mexican"
     EUROPE = "EUROPE", "Europe"
     PERUVIAN = "PERUVIAN", "Peruvian"
+    VIETNAMESE = "VIETNAMESE", "Vietnamese"
     OTHER = "OTHER", "Other"
 
 

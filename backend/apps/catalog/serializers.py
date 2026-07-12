@@ -46,6 +46,7 @@ SPANISH_CHOICE_LABELS = {
         "MEXICAN": "Mexicana",
         "EUROPE": "Europea",
         "PERUVIAN": "Peruana",
+        "VIETNAMESE": "Vietnamita",
         "OTHER": "Otra",
     },
     "ply_rating": {
