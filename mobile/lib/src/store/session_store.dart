@@ -16,6 +16,9 @@ class SessionStore extends ChangeNotifier {
 
   final CatalogApiService _apiService;
 
+  static const int _initCapabilitiesMaxAttempts = 2;
+  static const Duration _initCapabilitiesRetryDelay = Duration(milliseconds: 400);
+
   bool _isInitializing = true;
   String? _token;
   Capabilities _capabilities = const Capabilities(<String, bool>{});
@@ -62,17 +65,40 @@ class SessionStore extends ChangeNotifier {
 
     if (isAuthenticated) {
       try {
-        final fresh = await _apiService.fetchCapabilities();
+        final fresh = await _fetchCapabilitiesDuringInit();
         _capabilities = fresh;
         await prefs.setString(_capabilitiesKey, jsonEncode(fresh.toJson()));
+      } on ApiException catch (error) {
+        if (error.statusCode == 401) {
+          await clearSession(notify: false);
+        }
       } catch (_) {
-        await clearSession(notify: false);
+        // No es un fallo de autenticación: se conserva la sesión.
       }
     }
 
     _isInitializing = false;
     _justLoggedIn = false;
     notifyListeners();
+  }
+
+  /// Obtiene las capabilities durante la inicialización con un reintento
+  /// acotado para errores transitorios (sin red, timeout, 5xx).
+  ///
+  /// Nunca reintenta ante un 401: ese es el único caso donde la sesión se
+  /// considera inválida y debe eliminarse.
+  Future<Capabilities> _fetchCapabilitiesDuringInit() async {
+    for (var attempt = 1; ; attempt++) {
+      try {
+        return await _apiService.fetchCapabilities();
+      } on ApiException catch (error) {
+        final transient = error.statusCode == null || error.statusCode! >= 500;
+        if (!transient || attempt >= _initCapabilitiesMaxAttempts) {
+          rethrow;
+        }
+        await Future<void>.delayed(_initCapabilitiesRetryDelay);
+      }
+    }
   }
 
   Future<void> login({

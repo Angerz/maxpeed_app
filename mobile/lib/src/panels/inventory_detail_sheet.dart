@@ -5,6 +5,7 @@ import '../models/inventory_detail.dart';
 import '../models/restock_request.dart';
 import '../screens/tire_purchase_price_history_screen.dart';
 import '../services/catalog_api_service.dart';
+import '../widgets/detail_info.dart';
 
 class InventoryDetailSheet extends StatefulWidget {
   const InventoryDetailSheet({
@@ -50,22 +51,38 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
     return '$yy-$mm-$dd $hh:$min';
   }
 
-  Widget _row(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 140,
-            child: Text(
-              '$label:',
-              style: const TextStyle(fontWeight: FontWeight.w700),
-            ),
+  Widget _buildHeader(InventoryDetail detail) {
+    final theme = Theme.of(context);
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                detail.code,
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              if (detail.brand.trim().isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  detail.brand,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ],
           ),
-          Expanded(child: Text(value.isEmpty ? '-' : value)),
-        ],
-      ),
+        ),
+        const SizedBox(width: 12),
+        StockBadge(stock: detail.stock),
+      ],
     );
   }
 
@@ -205,24 +222,78 @@ class _InventoryDetailSheetState extends State<InventoryDetailSheet> {
                 children: [
                   _buildImagePreview(detail),
                   const SizedBox(height: 14),
-                  Text(
-                    detail.code,
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
+                  _buildHeader(detail),
+                  const SizedBox(height: 16),
+                  DetailSection(
+                    title: 'Detalle del producto',
+                    children: [
+                      DetailSpecRow(
+                        icon: Icons.category_outlined,
+                        label: 'Tipo',
+                        value: detail.tireType,
+                      ),
+                      DetailSpecRow(
+                        icon: Icons.inventory_2_outlined,
+                        label: 'Stock',
+                        value: '${detail.stock}',
+                        valueColor: detail.stock == 0
+                            ? Theme.of(context).colorScheme.error
+                            : null,
+                      ),
+                      DetailSpecRow(
+                        icon: Icons.person_outline,
+                        label: 'Dueño',
+                        value: detail.owner?.name ?? '-',
+                      ),
+                      DetailSpecRow(
+                        icon: Icons.notes_rounded,
+                        label: 'Detalles',
+                        value: detail.details,
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 12),
-                  _row('Código', detail.code),
-                  _row('Tipo', detail.tireType),
-                  _row('Marca', detail.brand),
-                  _row('Stock', '${detail.stock}'),
-                  _row('Dueño', detail.owner?.name ?? '-'),
-                  _row('Detalles', detail.details),
-                  _row('Precio compra', detail.purchasePrice),
-                  _row('Precio sugerido', detail.suggestedSalePrice),
-                  _row('Último restock', _formatDate(detail.lastRestockAt)),
-                  _row('Creado', _formatDate(detail.createdAt)),
-                  _row('Actualizado', _formatDate(detail.updatedAt)),
+                  const SizedBox(height: 14),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: DetailStatCard(
+                          icon: Icons.shopping_cart_outlined,
+                          label: 'Precio compra',
+                          value: detail.purchasePrice,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: DetailStatCard(
+                          icon: Icons.sell_outlined,
+                          label: 'Precio sugerido',
+                          value: detail.suggestedSalePrice,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  DetailSection(
+                    title: 'Historial',
+                    children: [
+                      DetailSpecRow(
+                        icon: Icons.add_box_outlined,
+                        label: 'Último restock',
+                        value: _formatDate(detail.lastRestockAt),
+                      ),
+                      DetailSpecRow(
+                        icon: Icons.event_outlined,
+                        label: 'Creado',
+                        value: _formatDate(detail.createdAt),
+                      ),
+                      DetailSpecRow(
+                        icon: Icons.update_outlined,
+                        label: 'Actualizado',
+                        value: _formatDate(detail.updatedAt),
+                      ),
+                    ],
+                  ),
                   if (widget.canViewPurchasePriceHistory &&
                       _isTireType(detail.tireType)) ...[
                     const SizedBox(height: 12),
